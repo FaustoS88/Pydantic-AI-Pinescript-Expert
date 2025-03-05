@@ -29,3 +29,11 @@ postgres-data/
 .vscode/
 *.swp
 .DS_Store
+
+#pinescript docs
+pinescript_docs
+test_results
+docs
+
+#chat history
+chat_history.pkl
