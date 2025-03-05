@@ -1,0 +1,7 @@
+pydantic-ai>=0.0.22
+openai>=1.7.0
+asyncpg>=0.29.0
+httpx>=0.26.0
+python-dotenv>=1.0.1
+pydantic>=2.6.0
+streamlit>=1.28.0
