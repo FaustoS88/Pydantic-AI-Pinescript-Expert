@@ -18,8 +18,12 @@ A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serv
 
 ## Screenshots
 
-![Alt text](/Users/faustosaccoccio/Documents/crawl4ai-main/pydantic_ai_docs/Pydantic_AI_Pinescript_Expert/assets/asset2.png?raw=true "Streamlit-ui")
-![Alt text](/Users/faustosaccoccio/Documents/crawl4ai-main/pydantic_ai_docs/Pydantic_AI_Pinescript_Expert/assets/asset1.png?raw=true "Streamlit-ui")
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/FaustoS88/Pydantic-AI-Pinescript-Expert/main/assets/asset1.png" alt="Asset 1" width="400"></td>
+    <td><img src="https://raw.githubusercontent.com/FaustoS88/Pydantic-AI-Pinescript-Expert/main/assets/asset2.png" alt="Asset 2" width="400"></td>
+  </tr>
+</table>
 
 ## Prerequisites
 
@@ -204,8 +208,7 @@ python db_inspect.py search "how to use request.security for different timeframe
 - **`agent.py`**: Core agent implementation with RAG capabilities
 - **`pinescript_crawler.py`**: Documentation crawler and vector database population
 - **`db_schema.py`**: Database schema definitions
-- **`streamlit_ui.py`**: Web-based user interface
-- **`streamlit_persistent.py`**: Enhanced UI with persistent chat history
+- **`streamlit_ui.py`**: Web-based user interface with persistent chat history
 - **`interactive.py`**: Command-line interface
 - **`run.py`**: Convenience runner for various operation modes
 - **`init_db.py`**: Database initialization
@@ -232,6 +235,7 @@ pinescript_agent = Agent(
     }
 )
 
+--------
 
 # Create a custom model that uses OpenRouter
     class OpenRouterModel(OpenAIModel):
