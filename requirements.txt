@@ -5,3 +5,4 @@ httpx>=0.26.0
 python-dotenv>=1.0.1
 pydantic>=2.6.0
 streamlit>=1.28.0
+crawl4ai>=0.4.247

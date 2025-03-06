@@ -197,7 +197,7 @@ python db_inspect.py count
 python db_inspect.py list
 
 # View a specific document
-python db_inspect.py view 1
+python db_inspect.py view 508
 
 # Test search functionality
 python db_inspect.py search "how to use request.security for different timeframes"
