@@ -33,7 +33,7 @@ python init_db.py
 
 ```bash
 # Run the crawler to get PineScript documentation
-python crawl_pinescript_db.py
+python pinescript_crawler.py
 ```
 
 ## 4. Use the Agent
@@ -64,6 +64,6 @@ python db_inspect.py search "moving average crossover"
 1. **Docker Issues**: Make sure Docker is running and port 54322 is available
 2. **Database Connection**: Verify connection string in `.env` file
 3. **Missing pgvector**: Run `python init_db.py` to check if pgvector is correctly installed
-4. **Embedding Issues**: Make sure your OpenAI API key is valid and has sufficient quota
+4. **Embedding Issues**: Make sure your OpenAI API key is valid and has sufficient quota, you can test it with `python api_debug.py`
 
-For more detailed instructions, see the full [README.md](README.md) and [DATABASE_SETUP.md](DATABASE_SETUP.md).
+For more detailed instructions, see the full [README.md](README.md) and [scripts.md](scripts.md).
