@@ -197,7 +197,7 @@ async def create_openrouter_model():
     
     # Create a custom model that uses OpenRouter
     class OpenRouterModel(OpenAIModel):
-        def __init__(self, model_name="deepseek/deepseek-chat"):
+        def __init__(self, model_name="openai/gpt-4.1-mini"):
             super().__init__(
                 model_name,
                 base_url="https://openrouter.ai/api/v1",
@@ -205,7 +205,7 @@ async def create_openrouter_model():
             )
     
     # Use a model ID that OpenRouter actually supports
-    return OpenRouterModel("deepseek/deepseek-chat")
+    return OpenRouterModel("openai/gpt-4.1-mini")
 
 async def run_agent(question: str):
     """Run the agent with a specific question."""

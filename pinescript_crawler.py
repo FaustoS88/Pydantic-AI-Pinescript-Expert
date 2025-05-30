@@ -330,8 +330,11 @@ class PineScriptDocsCrawler:
                                     page_name = url.rstrip('/').split('/')[-1] or 'index'
                                     file_path = f"{self.output_dir}/{page_name}_{timestamp}.md"
                                     
-                                    # Get the markdown content
-                                    markdown = result.markdown_v2.raw_markdown
+                                    # Get the markdown content - handle both string and MarkdownGenerationResult object
+                                    if isinstance(result.markdown, str):
+                                        markdown = result.markdown
+                                    else:
+                                        markdown = result.markdown.raw_markdown if result.markdown else ""
                                     
                                     # Save individual file
                                     with open(file_path, "w", encoding="utf-8") as f:

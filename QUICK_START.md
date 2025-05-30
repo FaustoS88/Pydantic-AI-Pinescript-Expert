@@ -1,6 +1,7 @@
 # Quick Start Guide
 
 This guide provides quick step-by-step instructions to get the PineScript Expert Agent up and running.
+For a step by instruction , please refer to the [README.md](README.md) and [scripts.md](scripts.md).
 
 ## 1. Set Up Environment
 
