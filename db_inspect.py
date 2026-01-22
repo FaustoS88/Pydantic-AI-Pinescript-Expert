@@ -65,13 +65,18 @@ async def test_search(query):
         print("Error: OPENAI_API_KEY not found in environment variables")
         return
         
-    openai = AsyncOpenAI(api_key=openai_api_key)
+    openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    openai = AsyncOpenAI(
+        api_key=openai_api_key,
+        base_url=openai_base_url
+    )
     
     # Generate embedding for query
-    print(f"Generating embedding for query: '{query}'")
+    embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5@f16")
+    print(f"Generating embedding for query: '{query}' using model: {embedding_model}")
     embedding = await openai.embeddings.create(
         input=query,
-        model="text-embedding-3-small",
+        model=embedding_model,
     )
     embedding_vector = embedding.data[0].embedding
     embedding_json = pydantic_core.to_json(embedding_vector).decode()

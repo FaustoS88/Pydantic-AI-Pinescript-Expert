@@ -52,7 +52,11 @@ class PineScriptDocsCrawler:
             os.environ["OPENAI_API_KEY"] = openai_api_key
         
         # Initialize client
-        self.openai = AsyncOpenAI(api_key=openai_api_key)
+        openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        self.openai = AsyncOpenAI(
+            api_key=openai_api_key,
+            base_url=openai_base_url
+        )
         
         # Create output directory
         os.makedirs(self.output_dir, exist_ok=True)
@@ -262,11 +266,13 @@ class PineScriptDocsCrawler:
                 if len(text) > max_length:
                     print(f"Truncating text from {len(text)} to {max_length} characters")
                     text = text[:max_length]
-                
+                 # Check what the current model should produce
+                embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5@f16")
                 response = await self.openai.embeddings.create(
                     input=text,
-                    model="text-embedding-3-small"
-                )
+                    model=embedding_model
+                )                       
+                print(f"🤖 Current embedding model: {embedding_model}")
                 return response.data[0].embedding
             except Exception as e:
                 print(f"Error generating embedding: {e}")

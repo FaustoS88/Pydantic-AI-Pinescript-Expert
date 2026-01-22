@@ -23,8 +23,13 @@ load_dotenv(override=True)
 # Print API keys (masked) to debug
 openai_key = os.getenv("OPENAI_API_KEY", "")
 openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
+
 print(f"OpenAI API key loaded: {openai_key[:4]}...{openai_key[-4:] if len(openai_key) > 8 else ''}")
 print(f"OpenRouter API key loaded: {openrouter_key[:4]}...{openrouter_key[-4:] if len(openrouter_key) > 8 else ''}")
+print(f"OpenAI model: {openai_model}")
+print(f"OpenRouter model: {openrouter_model}")
 
 def get_openai_api_key() -> str:
     """Get OpenAI API key with validation and user prompt if needed."""
@@ -83,10 +88,10 @@ class Dependencies:
     use_openrouter: bool = False
 
 # Initialize the agent with appropriate settings
+openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 pinescript_agent = Agent(
-    "openai:gpt-4o-mini",  # Default model
+    f"openai:{openai_model}",  # Use configurable model
     deps_type=Dependencies,
-    result_type=PineScriptResult,
     system_prompt=(
         "You are a Pine Script v6 expert assistant. Pine Script is the programming language used in TradingView "
         "for creating custom indicators and strategies for technical analysis of financial markets. "
@@ -134,7 +139,8 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
         print(f"Generating embedding for query: {search_query}")
         embedding = await openai_client.embeddings.create(
             input=search_query,
-            model="text-embedding-3-small",
+            #model="text-embedding-3-small",
+            model="text-embedding-nomic-embed-text-v1.5@f16",
         )
         print(f"Embedding generated successfully")
 
@@ -195,26 +201,34 @@ async def create_openrouter_model():
         print("OPENROUTER_API_KEY not found in environment variables, using OpenAI")
         return None
     
+    # Get configurable model name
+    openrouter_model_name = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
+    
     # Create a custom model that uses OpenRouter
     class OpenRouterModel(OpenAIModel):
-        def __init__(self, model_name="openai/gpt-4.1-mini"):
+        def __init__(self, model_name=openrouter_model_name):
             super().__init__(
                 model_name,
                 base_url="https://openrouter.ai/api/v1",
                 api_key=openrouter_api_key
             )
     
-    # Use a model ID that OpenRouter actually supports
-    return OpenRouterModel("openai/gpt-4.1-mini")
+    # Use the configurable model ID
+    return OpenRouterModel(openrouter_model_name)
 
 async def run_agent(question: str):
     """Run the agent with a specific question."""
     print(f"Running agent with question: {question}")
     
-    # Initialize OpenAI client with explicit key
+    # Initialize OpenAI client with explicit key and configurable base_url
     openai_api_key = get_openai_api_key()
-    openai = AsyncOpenAI(api_key=openai_api_key)
-    print("OpenAI client initialized")
+    openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    
+    openai = AsyncOpenAI(
+        api_key=openai_api_key,
+        base_url=openai_base_url
+    )
+    print(f"OpenAI client initialized with base_url: {openai_base_url}")
     
     # Check if OpenRouter should be used
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
@@ -235,24 +249,52 @@ async def run_agent(question: str):
             
             # Override the model with OpenRouter if available
             if use_openrouter:
-                print("Using OpenRouter for queries")
+                openrouter_model_name = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
+                print(f"Using OpenRouter model: {openrouter_model_name}")
                 try:
                     openrouter_model = await create_openrouter_model()
                     if openrouter_model:
                         with pinescript_agent.override(model=openrouter_model):
-                            answer = await pinescript_agent.run(question, deps=deps)
+                            raw_result = await pinescript_agent.run(question, deps=deps)
                     else:
                         print("OpenRouter model creation failed, using default OpenAI model")
-                        answer = await pinescript_agent.run(question, deps=deps)
+                        raw_result = await pinescript_agent.run(question, deps=deps)
                 except Exception as e:
                     print(f"OpenRouter failed: {e}, falling back to OpenAI")
-                    answer = await pinescript_agent.run(question, deps=deps)
+                    raw_result = await pinescript_agent.run(question, deps=deps)
             else:
-                print("Using default OpenAI model")
-                answer = await pinescript_agent.run(question, deps=deps)
+                openai_model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+                print(f"Using OpenAI model: {openai_model_name}")
+                raw_result = await pinescript_agent.run(question, deps=deps)
                 
             print("Agent response received")
-            return answer
+            
+            # Create a structured result
+            snippets_used = 0
+            if hasattr(raw_result, 'all_messages'):
+                # Try to extract snippets_used from the context if available
+                for message in raw_result.all_messages():
+                    if hasattr(message, 'parts'):
+                        for part in message.parts:
+                            if hasattr(part, 'tool_calls'):
+                                # This is a rough estimate - in practice you might want to track this differently
+                                snippets_used = 8  # Default assumption
+                                break
+            
+            # Create a mock result object that matches the expected structure
+            class MockResult:
+                def __init__(self, response, query, snippets):
+                    self.data = PineScriptResult(
+                        query=query,
+                        response=response,
+                        snippets_used=snippets
+                    )
+            
+            # Extract the actual response text
+            response_text = str(raw_result.data) if hasattr(raw_result, 'data') else str(raw_result)
+            
+            return MockResult(response_text, question, snippets_used)
+            
     except Exception as e:
         print(f"Error running agent: {e}")
         return None

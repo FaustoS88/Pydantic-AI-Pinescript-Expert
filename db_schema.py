@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS pinescript_docs (
   title text NOT NULL,
   content text NOT NULL,
   embedding vector(1536) NOT NULL
+  embedding768 vector(768) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_pinescript_docs_embedding ON pinescript_docs USING hnsw (embedding vector_l2_ops);

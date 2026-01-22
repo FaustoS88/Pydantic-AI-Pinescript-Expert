@@ -56,10 +56,15 @@ async def main():
     # Test AsyncOpenAI client
     print_section("Async OpenAI Client Test")
     try:
-        async_client = AsyncOpenAI(api_key=api_key)
+        openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        async_client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=openai_base_url
+        )
         models = await async_client.models.list()
         print("✅ Async OpenAI client works!")
         print(f"Found {len(models.data)} models")
+        print(f"Using base_url: {openai_base_url}")
     except Exception as e:
         print(f"❌ Async OpenAI client failed: {e}")
     

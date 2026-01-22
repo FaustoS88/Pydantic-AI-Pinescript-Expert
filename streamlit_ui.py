@@ -122,7 +122,11 @@ async def verify_setup():
 # Function to process messages with history for context
 async def process_query(prompt, history=[]):
     # Create clients and dependencies
-    openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    openai_client = AsyncOpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url=openai_base_url
+    )
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     
     # Connect to database
