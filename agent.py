@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import sys
 import json
@@ -20,51 +21,65 @@ from dotenv import load_dotenv
 # Force reload environment variables
 load_dotenv(override=True)
 
-# Print API keys (masked) to debug
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Log masked API keys at DEBUG level for startup diagnostics
 openai_key = os.getenv("OPENAI_API_KEY", "")
 openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
-print(f"OpenAI API key loaded: {openai_key[:4]}...{openai_key[-4:] if len(openai_key) > 8 else ''}")
-print(f"OpenRouter API key loaded: {openrouter_key[:4]}...{openrouter_key[-4:] if len(openrouter_key) > 8 else ''}")
+logger.debug(
+    "OpenAI API key loaded: %s...%s",
+    openai_key[:4],
+    openai_key[-4:] if len(openai_key) > 8 else "",
+)
+logger.debug(
+    "OpenRouter API key loaded: %s...%s",
+    openrouter_key[:4],
+    openrouter_key[-4:] if len(openrouter_key) > 8 else "",
+)
 
 def get_openai_api_key() -> str:
     """Get OpenAI API key with validation and user prompt if needed."""
     # Try to get from environment
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    
+
     # Check if key is missing or has a placeholder value
     if not openai_api_key or openai_api_key in ["YOUR_OPENAI_API_KEY", "sk-...", "YOUR_OPE***_API"] or "YOUR_" in openai_api_key:
-        print("Warning: OPENAI_API_KEY environment variable is not set or has a placeholder value.")
+        logger.warning("OPENAI_API_KEY is not set or has a placeholder value.")
         print("Please enter your OpenAI API key:")
         openai_api_key = input("> ")
-        
+
         if not openai_api_key:
             raise ValueError("OpenAI API key is required to continue.")
-        
+
         # Save to environment for this session
         os.environ["OPENAI_API_KEY"] = openai_api_key
-        
+
         # Also update the .env file for future runs
         env_path = os.path.join(os.path.dirname(__file__), ".env")
         try:
             from dotenv import set_key
             set_key(env_path, "OPENAI_API_KEY", openai_api_key)
-            print(f"Updated OPENAI_API_KEY in {env_path} for future runs")
+            logger.info("Updated OPENAI_API_KEY in %s for future runs", env_path)
         except ImportError:
-            print("Could not update .env file - dotenv.set_key not available")
-            print(f"Please manually update {env_path} with your API key")
-    
+            logger.warning("Could not update .env file - dotenv.set_key not available")
+            logger.warning("Please manually update %s with your API key", env_path)
+
     # Verify it's not still using a placeholder
     if "YOUR_" in openai_api_key or openai_api_key == "sk-...":
-        print("Warning: API key appears to be a placeholder value.")
+        logger.warning("API key appears to be a placeholder value.")
         print("Please enter your actual OpenAI API key:")
         openai_api_key = input("> ")
-        
+
         if not openai_api_key:
             raise ValueError("OpenAI API key is required to continue.")
-        
+
         # Save to environment for this session
         os.environ["OPENAI_API_KEY"] = openai_api_key
-    
+
     return openai_api_key
 
 
@@ -118,11 +133,11 @@ async def add_style_prompt(ctx: RunContext[Dependencies]) -> str:
 @pinescript_agent.tool
 async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
     """Retrieve relevant Pine Script documentation based on a search query.
-    
+
     Args:
         ctx: The run context with dependencies
         search_query: The search query to find relevant documentation
-        
+
     Returns:
         str: Concatenated documentation snippets relevant to the query
     """
@@ -130,71 +145,71 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
         # Always use OpenAI for embeddings, never OpenRouter
         # This is the critical fix to ensure embeddings always use OpenAI
         openai_client = ctx.deps.openai
-        
-        print(f"Generating embedding for query: {search_query}")
+
+        logger.debug("Generating embedding for query: %s", search_query)
         embedding = await openai_client.embeddings.create(
             input=search_query,
             model="text-embedding-3-small",
         )
-        print(f"Embedding generated successfully")
+        logger.debug("Embedding generated successfully")
 
         embedding_vector = embedding.data[0].embedding
         embedding_json = pydantic_core.to_json(embedding_vector).decode()
-        
-        print(f"Querying database for relevant documentation")
+
+        logger.debug("Querying database for relevant documentation")
         rows = await ctx.deps.pool.fetch(
             "SELECT url, title, content FROM pinescript_docs ORDER BY embedding <-> $1 LIMIT 8",
             embedding_json,
         )
-        print(f"Found {len(rows)} relevant documentation snippets")
-        
+        logger.debug("Found %d relevant documentation snippets", len(rows))
+
         if not rows:
             return "No relevant documentation found in the database. The database may need to be populated with Pine Script documentation."
-        
+
         # Count the snippets for the result metadata
         ctx.custom_data = {"snippets_used": len(rows)}
-        
+
         return "\n\n".join(
             f"# {row['title']}\nDocumentation URL: {row['url']}\n\n{row['content']}\n"
             for row in rows
         )
     except Exception as e:
-        print(f"Error in retrieve tool: {e}")
+        logger.error("Error in retrieve tool: %s", e)
         return f"Error retrieving documentation: {str(e)}"
 
 @asynccontextmanager
 async def database_connect(create_db: bool = False) -> AsyncGenerator[asyncpg.Pool, None]:
     """Connect to the database with the Pine Script documentation.
-    
+
     Args:
         create_db: Whether to create the database if it doesn't exist
-        
+
     Yields:
         asyncpg.Pool: A connection pool to the database
     """
     # Use the connection string directly from environment variables
     db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:54322/postgres")
-    
-    print(f"Connecting to database: {db_url}")
+
+    logger.info("Connecting to database: %s", db_url)
     try:
         pool = await asyncpg.create_pool(db_url)
-        print("Database connection established")
+        logger.info("Database connection established")
         try:
             yield pool
         finally:
             await pool.close()
-            print("Database connection closed")
+            logger.info("Database connection closed")
     except Exception as e:
-        print(f"Error connecting to database: {e}")
+        logger.error("Error connecting to database: %s", e)
         raise
 
 async def create_openrouter_model():
     """Create an OpenRouter model if the API key is available."""
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     if not openrouter_api_key:
-        print("OPENROUTER_API_KEY not found in environment variables, using OpenAI")
+        logger.info("OPENROUTER_API_KEY not found in environment variables, using OpenAI")
         return None
-    
+
     # Create a custom model that uses OpenRouter
     class OpenRouterModel(OpenAIModel):
         def __init__(self, model_name="openai/gpt-4.1-mini"):
@@ -203,28 +218,28 @@ async def create_openrouter_model():
                 base_url="https://openrouter.ai/api/v1",
                 api_key=openrouter_api_key
             )
-    
+
     # Use a model ID that OpenRouter actually supports
     return OpenRouterModel("openai/gpt-4.1-mini")
 
 async def run_agent(question: str):
     """Run the agent with a specific question."""
-    print(f"Running agent with question: {question}")
-    
+    logger.info("Running agent with question: %s", question)
+
     # Initialize OpenAI client with explicit key
     openai_api_key = get_openai_api_key()
     openai = AsyncOpenAI(api_key=openai_api_key)
-    print("OpenAI client initialized")
-    
+    logger.debug("OpenAI client initialized")
+
     # Check if OpenRouter should be used
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     use_openrouter = bool(openrouter_api_key)
-    
+
     # Connect to database and run the agent
     try:
         async with database_connect(False) as pool:
-            print("Database connection ready")
-            
+            logger.debug("Database connection ready")
+
             # Create dependencies
             deps = Dependencies(
                 openai=openai,
@@ -232,29 +247,29 @@ async def run_agent(question: str):
                 openrouter_api_key=openrouter_api_key,
                 use_openrouter=use_openrouter
             )
-            
+
             # Override the model with OpenRouter if available
             if use_openrouter:
-                print("Using OpenRouter for queries")
+                logger.info("Using OpenRouter for queries")
                 try:
                     openrouter_model = await create_openrouter_model()
                     if openrouter_model:
                         with pinescript_agent.override(model=openrouter_model):
                             answer = await pinescript_agent.run(question, deps=deps)
                     else:
-                        print("OpenRouter model creation failed, using default OpenAI model")
+                        logger.warning("OpenRouter model creation failed, using default OpenAI model")
                         answer = await pinescript_agent.run(question, deps=deps)
                 except Exception as e:
-                    print(f"OpenRouter failed: {e}, falling back to OpenAI")
+                    logger.warning("OpenRouter failed: %s, falling back to OpenAI", e)
                     answer = await pinescript_agent.run(question, deps=deps)
             else:
-                print("Using default OpenAI model")
+                logger.info("Using default OpenAI model")
                 answer = await pinescript_agent.run(question, deps=deps)
-                
-            print("Agent response received")
+
+            logger.debug("Agent response received")
             return answer
     except Exception as e:
-        print(f"Error running agent: {e}")
+        logger.error("Error running agent: %s", e)
         return None
 
 async def main():
@@ -263,10 +278,10 @@ async def main():
         question = " ".join(sys.argv[1:])
     else:
         question = "How do I define a variable in Pine Script v6?"
-    
+
     print(f"Question: {question}")
     result = await run_agent(question)
-    
+
     if result:
         print("\nResponse:")
         print(result.data.response)
