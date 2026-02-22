@@ -38,7 +38,7 @@ A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serv
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/pinescript-expert.git
+   git clone https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert.git
    cd pinescript-expert
    ```
 
