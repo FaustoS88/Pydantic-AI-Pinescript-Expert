@@ -10,6 +10,7 @@ This script:
 Run this script before running the crawler or using the agent.
 """
 
+import logging
 import os
 import asyncio
 import asyncpg
@@ -20,61 +21,63 @@ from db_schema import DB_SCHEMA
 # Load environment variables
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 async def init_database():
     """Initialize the database"""
     # Get database connection parameters
     db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:54322/postgres")
-    
-    print(f"Connecting to database: {db_url}")
-    
+
+    logger.info("Connecting to database: %s", db_url)
+
     # Connect to the database
     try:
         conn = await asyncpg.connect(db_url)
-        print("Connected to database")
-        
+        logger.info("Connected to database")
+
         # Create schema
-        print("Creating schema...")
+        logger.info("Creating schema...")
         await conn.execute(DB_SCHEMA)
-        print("Schema created successfully")
-        
+        logger.info("Schema created successfully")
+
         # Verify tables
         tables = await conn.fetch(
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
         )
-        print("\nTables in database:")
+        logger.info("Tables in database:")
         for table in tables:
-            print(f"  - {table['table_name']}")
-        
+            logger.info("  - %s", table['table_name'])
+
         # Verify vector extension
         extensions = await conn.fetch(
             "SELECT extname FROM pg_extension"
         )
-        print("\nExtensions in database:")
+        logger.info("Extensions in database:")
         for ext in extensions:
-            print(f"  - {ext['extname']}")
-        
+            logger.info("  - %s", ext['extname'])
+
         # Check if vector extension is installed
         vector_ext = await conn.fetchval(
             "SELECT 1 FROM pg_extension WHERE extname = 'vector'"
         )
         if vector_ext:
-            print("\n✅ Vector extension is installed")
+            logger.info("Vector extension is installed")
         else:
-            print("\n❌ Vector extension is NOT installed")
-            print("Please install the pgvector extension")
-            
+            logger.warning("Vector extension is NOT installed — please install pgvector")
+
         # Done
-        print("\nDatabase initialization complete")
-        
+        logger.info("Database initialization complete")
+
     except Exception as e:
-        print(f"Error initializing database: {e}")
+        logger.error("Error initializing database: %s", e)
     finally:
         if 'conn' in locals():
             await conn.close()
-            print("Database connection closed")
+            logger.info("Database connection closed")
 
 def main():
     """Main entry point"""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     asyncio.run(init_database())
 
 if __name__ == "__main__":
