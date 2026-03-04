@@ -6,9 +6,7 @@ Run this script to have an interactive conversation with the agent.
 """
 
 import asyncio
-import os
 import sys
-from typing import List, Dict, Any
 from dotenv import load_dotenv
 
 from agent import run_agent, PineScriptResult, get_openai_api_key

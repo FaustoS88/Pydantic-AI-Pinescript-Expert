@@ -9,7 +9,6 @@ check vector quality, and perform test searches without running the full agent.
 import os
 import sys
 import asyncio
-import json
 import pydantic_core
 from dotenv import load_dotenv
 from agent import database_connect

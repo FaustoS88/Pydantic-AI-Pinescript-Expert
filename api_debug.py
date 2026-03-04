@@ -7,7 +7,6 @@ different aspects of the initialization and request process.
 """
 
 import os
-import sys
 import asyncio
 from dotenv import load_dotenv
 from openai import OpenAI, AsyncOpenAI

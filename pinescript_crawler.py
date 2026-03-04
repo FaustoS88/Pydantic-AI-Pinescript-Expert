@@ -4,33 +4,26 @@ import asyncio
 import logging
 import os
 import sys
-import json
 import re
 import pydantic_core
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from typing import List, Dict, Any, AsyncGenerator, Set
+from typing import List, Dict, Set
 
 import asyncpg
-import httpx
 from openai import AsyncOpenAI
-from pydantic import BaseModel, Field
-from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.openai import OpenAIModel
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from datetime import datetime
 
 # Import crawler from crawl4ai
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+from crawl4ai import AsyncWebCrawler, BrowserConfig
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
 # Force reload environment variables
 load_dotenv(override=True)
 
 # Import database setup functions
-from db_schema import create_schema
-from agent import database_connect
+from db_schema import create_schema  # noqa: E402
+from agent import database_connect  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

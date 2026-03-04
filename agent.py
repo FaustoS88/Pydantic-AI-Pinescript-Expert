@@ -4,14 +4,12 @@ import asyncio
 import logging
 import os
 import sys
-import json
 import pydantic_core
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import List, Dict, Any, AsyncGenerator
+from typing import AsyncGenerator
 
 import asyncpg
-import httpx
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext

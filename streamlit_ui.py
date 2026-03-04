@@ -2,20 +2,19 @@ import streamlit as st
 import asyncio
 import os
 import sys
-import json
 import pickle
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
-from pydantic_ai.messages import ModelMessage, ModelRequest, UserPromptPart
+from pydantic_ai.messages import ModelRequest, UserPromptPart
 
 # Add the parent directory to the path so we can import the agent
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
 
 # Import the agent components
-from agent import database_connect, Dependencies, pinescript_agent
-from db_schema import validate_schema
+from agent import database_connect, Dependencies, pinescript_agent  # noqa: E402
+from db_schema import validate_schema  # noqa: E402
 
 # Load environment variables
 load_dotenv(override=True)
@@ -173,7 +172,7 @@ else:
 # OpenRouter detection
 openrouter_key = os.getenv("OPENROUTER_API_KEY")
 if openrouter_key:
-    st.sidebar.success(f"✅ Using OpenRouter for queries")
+    st.sidebar.success("✅ Using OpenRouter for queries")
 else:
     st.sidebar.info("Using OpenAI for queries (no OpenRouter key found)")
 

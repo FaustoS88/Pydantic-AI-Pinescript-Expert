@@ -7,7 +7,6 @@ to prepare for a fresh crawl without conflicting data.
 """
 
 import asyncio
-import os
 from dotenv import load_dotenv
 from agent import database_connect
 from db_schema import validate_schema

@@ -4,7 +4,6 @@ Setup script for the Pine Script Expert Agent.
 This script helps set up the environment and database for the agent.
 """
 
-import os
 import sys
 import subprocess
 import shutil
