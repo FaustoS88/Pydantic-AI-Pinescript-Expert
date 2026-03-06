@@ -28,6 +28,8 @@ dependencies = [
     "pydantic>=2.6.0",
     "streamlit>=1.28.0",
     "crawl4ai>=0.4.247",
+    "sentence-transformers>=3.0.0",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]

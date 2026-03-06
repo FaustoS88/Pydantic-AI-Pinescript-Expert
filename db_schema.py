@@ -12,10 +12,45 @@ CREATE TABLE IF NOT EXISTS pinescript_docs (
   url text NOT NULL UNIQUE,
   title text NOT NULL,
   content text NOT NULL,
-  embedding vector(1536) NOT NULL
+  embedding vector(1536) NOT NULL,
+  search_vector tsvector
 );
 
-CREATE INDEX IF NOT EXISTS idx_pinescript_docs_embedding ON pinescript_docs USING hnsw (embedding vector_l2_ops);
+-- Use cosine ops (not L2) — OpenAI embeddings are normalized for cosine similarity
+CREATE INDEX IF NOT EXISTS idx_pinescript_docs_embedding
+  ON pinescript_docs USING hnsw (embedding vector_cosine_ops);
+
+-- GIN index for full-text search (BM25-style)
+CREATE INDEX IF NOT EXISTS idx_pinescript_docs_search
+  ON pinescript_docs USING gin (search_vector);
+"""
+
+# Migration SQL to upgrade existing tables with tsvector + cosine index
+DB_MIGRATION = """
+-- Add search_vector column if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pinescript_docs' AND column_name = 'search_vector'
+  ) THEN
+    ALTER TABLE pinescript_docs ADD COLUMN search_vector tsvector;
+  END IF;
+END $$;
+
+-- Populate search_vector from existing title + content
+UPDATE pinescript_docs
+SET search_vector = to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, ''))
+WHERE search_vector IS NULL;
+
+-- Create GIN index for full-text search
+CREATE INDEX IF NOT EXISTS idx_pinescript_docs_search
+  ON pinescript_docs USING gin (search_vector);
+
+-- Recreate HNSW index with cosine ops (drop L2 ops index first if exists)
+DROP INDEX IF EXISTS idx_pinescript_docs_embedding;
+CREATE INDEX IF NOT EXISTS idx_pinescript_docs_embedding
+  ON pinescript_docs USING hnsw (embedding vector_cosine_ops);
 """
 
 # Function to validate the schema (can be called to ensure DB is ready)
@@ -61,10 +96,10 @@ async def validate_schema(pool):
 # Function to create the schema
 async def create_schema(pool):
     """Create the database schema.
-    
+
     Args:
         pool: Database connection pool
-        
+
     Returns:
         bool: Whether the schema was created successfully
     """
@@ -76,4 +111,26 @@ async def create_schema(pool):
         return True
     except Exception as e:
         print(f"Error creating schema: {e}")
+        return False
+
+
+async def run_migration(pool):
+    """Run migration to add tsvector column and update indexes.
+
+    Safe to run multiple times — all operations are idempotent.
+
+    Args:
+        pool: Database connection pool
+
+    Returns:
+        bool: Whether the migration ran successfully
+    """
+    try:
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(DB_MIGRATION)
+        print("Migration completed successfully")
+        return True
+    except Exception as e:
+        print(f"Error running migration: {e}")
         return False

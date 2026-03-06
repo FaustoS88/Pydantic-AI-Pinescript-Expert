@@ -25,6 +25,34 @@ EMBEDDING_DIMENSION = 1536  # fixed for text-embedding-3-small
 VECTOR_SEARCH_LIMIT = int(os.getenv("PINESCRIPT_VECTOR_SEARCH_LIMIT", "8"))
 
 # ---------------------------------------------------------------------------
+# Advanced RAG settings
+# ---------------------------------------------------------------------------
+
+# Hybrid search: weight between vector (1.0) and BM25 (0.0)
+HYBRID_SEARCH_ALPHA = float(os.getenv("PINESCRIPT_HYBRID_ALPHA", "0.5"))
+
+# Similarity threshold (cosine): discard results below this score
+SIMILARITY_THRESHOLD = float(os.getenv("PINESCRIPT_SIMILARITY_THRESHOLD", "0.3"))
+
+# Retrieval candidates before reranking
+RETRIEVAL_CANDIDATES = int(os.getenv("PINESCRIPT_RETRIEVAL_CANDIDATES", "15"))
+
+# Final results after reranking
+RERANK_TOP_N = int(os.getenv("PINESCRIPT_RERANK_TOP_N", "5"))
+
+# Cross-encoder model for reranking
+RERANK_MODEL = os.getenv(
+    "PINESCRIPT_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+)
+
+# MMR diversity parameter (1.0 = pure relevance, 0.0 = pure diversity)
+MMR_LAMBDA = float(os.getenv("PINESCRIPT_MMR_LAMBDA", "0.7"))
+
+# Chunking parameters
+CHUNK_SIZE = int(os.getenv("PINESCRIPT_CHUNK_SIZE", "500"))
+CHUNK_OVERLAP = int(os.getenv("PINESCRIPT_CHUNK_OVERLAP", "50"))
+
+# ---------------------------------------------------------------------------
 # OpenRouter settings
 # ---------------------------------------------------------------------------
 

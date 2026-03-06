@@ -4,7 +4,6 @@ import asyncio
 import logging
 import os
 import sys
-import pydantic_core
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncGenerator
@@ -23,9 +22,14 @@ from config import (
     LLM_TEMPERATURE,
     OPENROUTER_BASE_URL,
     OPENROUTER_DEFAULT_MODEL,
-    VECTOR_SEARCH_LIMIT,
     DEFAULT_DATABASE_URL,
+    HYBRID_SEARCH_ALPHA,
+    SIMILARITY_THRESHOLD,
+    RETRIEVAL_CANDIDATES,
+    RERANK_TOP_N,
+    MMR_LAMBDA,
 )
+from rag_utils import hybrid_retrieve
 
 # Force reload environment variables
 load_dotenv(override=True)
@@ -141,7 +145,10 @@ async def add_style_prompt(ctx: RunContext[Dependencies]) -> str:
 
 @pinescript_agent.tool
 async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
-    """Retrieve relevant Pine Script documentation based on a search query.
+    """Retrieve relevant Pine Script documentation using hybrid search pipeline.
+
+    Pipeline: vector + BM25 → RRF fusion → similarity threshold → cross-encoder
+    reranking → MMR deduplication.
 
     Args:
         ctx: The run context with dependencies
@@ -151,36 +158,34 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
         str: Concatenated documentation snippets relevant to the query
     """
     try:
-        # Always use OpenAI for embeddings, never OpenRouter
-        # This is the critical fix to ensure embeddings always use OpenAI
         openai_client = ctx.deps.openai
 
-        logger.debug("Generating embedding for query: %s", search_query)
-        embedding = await openai_client.embeddings.create(
-            input=search_query,
-            model=EMBEDDING_MODEL,
+        logger.debug("Running hybrid retrieval for: %s", search_query)
+
+        docs = await hybrid_retrieve(
+            pool=ctx.deps.pool,
+            openai_client=openai_client,
+            query=search_query,
+            embedding_model=EMBEDDING_MODEL,
+            candidates=RETRIEVAL_CANDIDATES,
+            alpha=HYBRID_SEARCH_ALPHA,
+            threshold=SIMILARITY_THRESHOLD,
+            top_n=RERANK_TOP_N,
+            mmr_lambda=MMR_LAMBDA,
         )
-        logger.debug("Embedding generated successfully")
 
-        embedding_vector = embedding.data[0].embedding
-        embedding_json = pydantic_core.to_json(embedding_vector).decode()
+        if not docs:
+            return (
+                "No relevant documentation found in the database. "
+                "The database may need to be populated with Pine Script documentation."
+            )
 
-        logger.debug("Querying database for relevant documentation")
-        rows = await ctx.deps.pool.fetch(
-            f"SELECT url, title, content FROM pinescript_docs ORDER BY embedding <-> $1 LIMIT {VECTOR_SEARCH_LIMIT}",
-            embedding_json,
-        )
-        logger.debug("Found %d relevant documentation snippets", len(rows))
-
-        if not rows:
-            return "No relevant documentation found in the database. The database may need to be populated with Pine Script documentation."
-
-        # Count the snippets for the result metadata
-        ctx.custom_data = {"snippets_used": len(rows)}
+        logger.debug("Hybrid retrieval returned %d documents", len(docs))
+        ctx.custom_data = {"snippets_used": len(docs)}
 
         return "\n\n".join(
-            f"# {row['title']}\nDocumentation URL: {row['url']}\n\n{row['content']}\n"
-            for row in rows
+            f"# {doc.title}\nDocumentation URL: {doc.url}\n\n{doc.content}\n"
+            for doc in docs
         )
     except Exception as e:
         logger.error("Error in retrieve tool: %s", e)
