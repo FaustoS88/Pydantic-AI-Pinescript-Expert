@@ -25,7 +25,6 @@ from config import (
     OPENROUTER_DEFAULT_MODEL,
     VECTOR_SEARCH_LIMIT,
     DEFAULT_DATABASE_URL,
-    get_preset,
 )
 
 # Force reload environment variables

@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
-import pytest
-
 
 class TestConfigDefaults:
     def test_default_model(self) -> None:
