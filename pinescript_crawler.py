@@ -22,8 +22,10 @@ from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 load_dotenv(override=True)
 
 # Import database setup functions
-from db_schema import create_schema  # noqa: E402
+from db_schema import create_schema, run_migration  # noqa: E402
 from agent import database_connect  # noqa: E402
+from rag_utils import prepend_chunk_header, recursive_character_split  # noqa: E402
+from config import CHUNK_SIZE, CHUNK_OVERLAP  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -295,8 +297,9 @@ class PineScriptDocsCrawler:
 
         # Connect to database
         async with database_connect(True) as pool:
-            # Create schema if needed
+            # Create schema if needed + run migration for tsvector + cosine index
             await create_schema(pool)
+            await run_migration(pool)
 
             # Process URLs
             async with AsyncWebCrawler(config=browser_config) as crawler:
@@ -417,80 +420,113 @@ class PineScriptDocsCrawler:
             # Convert to JSON
             embedding_json = pydantic_core.to_json(embedding).decode()
 
-            # Insert into database
+            # Insert into database with tsvector for hybrid search
             await pool.execute(
                 """
-                INSERT INTO pinescript_docs (url, title, content, embedding)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO pinescript_docs (url, title, content, embedding, search_vector)
+                VALUES ($1, $2, $3, $4,
+                        to_tsvector('english', coalesce($2, '') || ' ' || coalesce($3, '')))
                 """,
                 section["url"],
                 section["title"],
                 section["content"],
-                embedding_json
+                embedding_json,
             )
 
             logger.debug("Inserted section: %s", section['title'])
 
     def split_into_sections(self, markdown: str, url: str) -> List[Dict[str, str]]:
-        """Split markdown into sections based on headings"""
+        """Split markdown into chunks using recursive character splitting with overlap.
+
+        Uses heading structure to identify sections, then applies recursive
+        character splitting within each section. Each chunk gets a contextual
+        header prepended for better embedding quality.
+        """
         sections = []
         lines = markdown.split("\n")
 
-        # Extract title from first heading or URL
+        # Extract page title from first heading or URL
         page_title = url.split("/")[-1].replace(".html", "").capitalize()
         if lines and lines[0].startswith("# "):
             page_title = lines[0][2:].strip()
             lines = lines[1:]
 
+        # First pass: identify heading-based sections
+        raw_sections: List[Dict[str, str]] = []
         current_section = None
-        current_content = []
+        current_content: List[str] = []
 
         for line in lines:
-            # Check for section headings
-            if line.startswith("## "):
+            if line.startswith("## ") or line.startswith("### "):
                 # Save previous section
                 if current_section and current_content:
                     content = "\n".join(current_content).strip()
                     if content:
-                        section_id = re.sub(r'[^a-z0-9]+', '-', current_section.lower())
-                        sections.append({
-                            "url": f"{url}#{section_id}",
-                            "title": f"{page_title} - {current_section}",
-                            "content": content
+                        raw_sections.append({
+                            "title": current_section,
+                            "content": content,
                         })
-
                 # Start new section
-                current_section = line[3:].strip()
+                heading = line.lstrip("#").strip()
+                current_section = heading
                 current_content = []
-            # Check for subsections
-            elif line.startswith("### "):
-                # Don't start a new main section, just add this as a subsection marker
-                if current_section:
-                    current_content.append(line)
-            # Add content to current section
             elif current_section:
                 current_content.append(line)
+            else:
+                # Content before any heading — use page title
+                current_content.append(line)
 
-        # Add the last section
+        # Save last section
         if current_section and current_content:
             content = "\n".join(current_content).strip()
             if content:
-                section_id = re.sub(r'[^a-z0-9]+', '-', current_section.lower())
-                sections.append({
-                    "url": f"{url}#{section_id}",
-                    "title": f"{page_title} - {current_section}",
-                    "content": content
+                raw_sections.append({
+                    "title": current_section,
+                    "content": content,
                 })
 
-        # If no sections found, use the entire document
-        if not sections and lines:
+        # Handle pre-heading content
+        if not current_section and current_content:
+            content = "\n".join(current_content).strip()
+            if content:
+                raw_sections.append({
+                    "title": page_title,
+                    "content": content,
+                })
+
+        # If no sections found at all, treat entire doc as one section
+        if not raw_sections and lines:
             content = "\n".join(lines).strip()
             if content:
-                sections.append({
-                    "url": url,
+                raw_sections.append({
                     "title": page_title,
-                    "content": content
+                    "content": content,
                 })
+
+        # Second pass: recursive character split within each section
+        chunk_idx = 0
+        for raw in raw_sections:
+            section_title = raw["title"]
+            chunks = recursive_character_split(
+                raw["content"],
+                chunk_size=CHUNK_SIZE,
+                chunk_overlap=CHUNK_OVERLAP,
+            )
+
+            for chunk in chunks:
+                if not chunk.strip():
+                    continue
+
+                # Prepend contextual chunk header
+                enriched = prepend_chunk_header(page_title, section_title, chunk)
+
+                section_id = re.sub(r'[^a-z0-9]+', '-', section_title.lower())
+                sections.append({
+                    "url": f"{url}#{section_id}-{chunk_idx}",
+                    "title": f"{page_title} - {section_title}",
+                    "content": enriched,
+                })
+                chunk_idx += 1
 
         return sections
 
