@@ -16,6 +16,18 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
 from dotenv import load_dotenv
 
+from config import (
+    DEFAULT_MODEL,
+    EMBEDDING_MODEL,
+    LLM_MAX_TOKENS,
+    LLM_TEMPERATURE,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_DEFAULT_MODEL,
+    VECTOR_SEARCH_LIMIT,
+    DEFAULT_DATABASE_URL,
+    get_preset,
+)
+
 # Force reload environment variables
 load_dotenv(override=True)
 
@@ -97,7 +109,7 @@ class Dependencies:
 
 # Initialize the agent with appropriate settings
 pinescript_agent = Agent(
-    "openai:gpt-4o-mini",  # Default model
+    DEFAULT_MODEL,
     deps_type=Dependencies,
     result_type=PineScriptResult,
     system_prompt=(
@@ -108,8 +120,8 @@ pinescript_agent = Agent(
         "Focus on being practical and giving working solutions for user problems."
     ),
     model_settings={
-        "temperature": 0.2,  # Lower temperature for more accurate, factual responses
-        "max_tokens": 2000   # Allow for detailed responses with code examples
+        "temperature": LLM_TEMPERATURE,
+        "max_tokens": LLM_MAX_TOKENS,
     }
 )
 
@@ -147,7 +159,7 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
         logger.debug("Generating embedding for query: %s", search_query)
         embedding = await openai_client.embeddings.create(
             input=search_query,
-            model="text-embedding-3-small",
+            model=EMBEDDING_MODEL,
         )
         logger.debug("Embedding generated successfully")
 
@@ -156,7 +168,7 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
 
         logger.debug("Querying database for relevant documentation")
         rows = await ctx.deps.pool.fetch(
-            "SELECT url, title, content FROM pinescript_docs ORDER BY embedding <-> $1 LIMIT 8",
+            f"SELECT url, title, content FROM pinescript_docs ORDER BY embedding <-> $1 LIMIT {VECTOR_SEARCH_LIMIT}",
             embedding_json,
         )
         logger.debug("Found %d relevant documentation snippets", len(rows))
@@ -186,7 +198,7 @@ async def database_connect(create_db: bool = False) -> AsyncGenerator[asyncpg.Po
         asyncpg.Pool: A connection pool to the database
     """
     # Use the connection string directly from environment variables
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:54322/postgres")
+    db_url = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
 
     logger.info("Connecting to database: %s", db_url)
     try:
@@ -210,15 +222,14 @@ async def create_openrouter_model():
 
     # Create a custom model that uses OpenRouter
     class OpenRouterModel(OpenAIModel):
-        def __init__(self, model_name="openai/gpt-4.1-mini"):
+        def __init__(self, model_name=OPENROUTER_DEFAULT_MODEL):
             super().__init__(
                 model_name,
-                base_url="https://openrouter.ai/api/v1",
+                base_url=OPENROUTER_BASE_URL,
                 api_key=openrouter_api_key
             )
 
-    # Use a model ID that OpenRouter actually supports
-    return OpenRouterModel("openai/gpt-4.1-mini")
+    return OpenRouterModel(OPENROUTER_DEFAULT_MODEL)
 
 async def run_agent(question: str):
     """Run the agent with a specific question."""
