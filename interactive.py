@@ -26,10 +26,11 @@ def ensure_api_key():
 
 class InteractiveAgent:
     """Interactive shell for the Pine Script Expert Agent"""
-    
-    def __init__(self):
+
+    def __init__(self, preset: str | None = None):
         self.message_history = []
         self.running = True
+        self.preset = preset
         self.print_welcome()
         
     def print_welcome(self):
@@ -39,6 +40,8 @@ class InteractiveAgent:
         print("=" * 80)
         print("Ask any question about Pine Script v6 or type 'exit' to quit.")
         print("Type 'clear' to clear the conversation history.")
+        if self.preset:
+            print(f"Model preset: {self.preset}")
         print("=" * 80 + "\n")
         
     async def process_input(self, user_input: str) -> bool:
@@ -61,7 +64,7 @@ class InteractiveAgent:
             
         print("\nProcessing your question...")
         try:
-            result = await run_agent(user_input)
+            result = await run_agent(user_input, preset=self.preset)
             
             if result and isinstance(result.data, PineScriptResult):
                 print("\n" + "=" * 80)
@@ -100,13 +103,13 @@ class InteractiveAgent:
             except Exception as e:
                 print(f"\nError: {e}")
 
-async def main():
+async def main(preset: str | None = None):
     """Main function to run the interactive shell"""
     # Ensure we have a valid API key before starting
     ensure_api_key()
-    
+
     # Run the interactive shell
-    interactive = InteractiveAgent()
+    interactive = InteractiveAgent(preset=preset)
     await interactive.run()
 
 if __name__ == "__main__":

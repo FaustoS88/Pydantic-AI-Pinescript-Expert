@@ -15,10 +15,17 @@ load_dotenv()
 def print_usage():
     """Print usage instructions"""
     print("Usage:")
-    print("  python run.py interactive   - Run the interactive shell")
-    print("  python run.py query <query> - Run a single query")
-    print("  python run.py populate <docs_dir> - Populate the database with documentation")
-    print("  python run.py check - Check the database setup")
+    print("  python run.py interactive [--model PRESET]  - Run the interactive shell")
+    print("  python run.py query <query> [--model PRESET] - Run a single query")
+    print("  python run.py populate <docs_dir>            - Populate the database with documentation")
+    print("  python run.py check                          - Check the database setup")
+    print()
+    print("Model presets (via --model):")
+    print("  default  - openai/gpt-4.1-mini")
+    print("  codex    - openai/gpt-5.3-codex")
+    print("  opus     - anthropic/claude-opus-4-6")
+    print("  flash    - google/gemini-3-flash-preview")
+    print("  <any>    - pass a raw OpenRouter model ID directly")
 
 async def check_database():
     """Check the database setup"""
@@ -42,27 +49,45 @@ async def check_database():
     except Exception as e:
         print(f"Error checking database: {e}")
 
+def _extract_model_flag(args: list[str]) -> tuple[str | None, list[str]]:
+    """Pull --model VALUE out of args, return (preset, remaining_args)."""
+    if "--model" in args:
+        idx = args.index("--model")
+        if idx + 1 < len(args):
+            preset = args[idx + 1]
+            remaining = args[:idx] + args[idx + 2:]
+            return preset, remaining
+        return None, args
+    return None, args
+
+
 async def run_command(command, args):
     """Run a command.
-    
+
     Args:
         command: The command to run
         args: The arguments for the command
     """
+    preset, args = _extract_model_flag(args)
+
     if command == "interactive":
         from interactive import main
-        await main()
-        
+        await main(preset=preset)
+
     elif command == "query":
         if not args:
             print("Error: No query provided")
-            print("Usage: python run.py query <query>")
+            print("Usage: python run.py query <query> [--model PRESET]")
             return
-            
+
         from agent import run_agent
         query = " ".join(args)
-        result = await run_agent(query)
-        
+        if preset:
+            from config import MODEL_PRESETS, get_preset
+            label = preset if preset not in MODEL_PRESETS else f"{preset} ({get_preset(preset)['model']})"
+            print(f"Model: {label}")
+        result = await run_agent(query, preset=preset)
+
         if result:
             print("\nResponse:")
             print(result.data.response)

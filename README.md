@@ -217,48 +217,37 @@ python db_inspect.py search "how to use request.security for different timeframe
 
 ## Advanced Configuration
 
-### Model Settings
+### Model Presets
 
-You can customize the agent's model settings in `agent.py`:
+Switch between LLM providers using the `--model` flag. Presets are defined in `config.py`:
 
-```python
-pinescript_agent = Agent(
-    "openai:gpt-4o-mini",
-    deps_type=Dependencies,
-    result_type=PineScriptResult,
-    system_prompt=(
-        "You are a Pine Script v6 expert assistant..."
-    ),
-    model_settings={
-        "temperature": 0.2,  # Adjust for more/less creativity
-        "max_tokens": 2000   # Adjust for longer/shorter responses
-    }
-)
+| Preset    | Model                           | Temperature | Max Tokens |
+|-----------|---------------------------------|-------------|------------|
+| `default` | `openai/gpt-4.1-mini`           | 0.2         | 2000       |
+| `codex`   | `openai/gpt-5.3-codex`          | 0.1         | 4096       |
+| `opus`    | `anthropic/claude-opus-4-6`     | 0.2         | 4096       |
+| `flash`   | `google/gemini-3-flash-preview` | 0.3         | 2000       |
 
---------
+```bash
+# Use a preset
+python run.py query "How to use request.security?" --model codex
+python run.py interactive --model opus
 
-# Create a custom model that uses OpenRouter
-    class OpenRouterModel(OpenAIModel):
-        def __init__(self, model_name="deepseek/deepseek-chat"): # Change model here
-            super().__init__(
-                model_name,
-                base_url="https://openrouter.ai/api/v1",
-                api_key=openrouter_api_key
-            )
-    
-    # Use a model ID that OpenRouter actually supports
-    return OpenRouterModel("deepseek/deepseek-chat") # Change model here
+# Or pass any OpenRouter model ID directly
+python run.py query "Explain ta.sma()" --model "anthropic/claude-sonnet-4.6"
 ```
 
-### Using OpenRouter
+All presets route through [OpenRouter](https://openrouter.ai/) — add your API key to `.env` as `OPENROUTER_API_KEY`. Without it, the agent falls back to the default OpenAI model.
 
-For access to alternative LLM providers:
+You can also override defaults via environment variables:
 
-1. Sign up at [OpenRouter](https://openrouter.ai/)
-2. Get an API key
-3. Add it to your `.env` file as `OPENROUTER_API_KEY`
-
-The agent will automatically use OpenRouter models when the API key is present.
+```bash
+PINESCRIPT_MODEL=openai:gpt-4o          # default LLM
+PINESCRIPT_TEMPERATURE=0.3              # response creativity
+PINESCRIPT_MAX_TOKENS=4096              # max response length
+PINESCRIPT_VECTOR_SEARCH_LIMIT=12       # RAG retrieval depth
+OPENROUTER_MODEL=anthropic/claude-opus-4-6  # default OpenRouter model
+```
 
 ### Custom Database Connection
 

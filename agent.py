@@ -212,69 +212,76 @@ async def database_connect(create_db: bool = False) -> AsyncGenerator[asyncpg.Po
         logger.error("Error connecting to database: %s", e)
         raise
 
-async def create_openrouter_model():
-    """Create an OpenRouter model if the API key is available."""
+def create_openrouter_model(model_id: str | None = None):
+    """Create an OpenRouter model.
+
+    Args:
+        model_id: OpenRouter model ID (e.g. ``openai/gpt-5.3-codex``).
+                  Falls back to OPENROUTER_DEFAULT_MODEL from config.
+    """
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     if not openrouter_api_key:
-        logger.info("OPENROUTER_API_KEY not found in environment variables, using OpenAI")
+        logger.info("OPENROUTER_API_KEY not found, using OpenAI")
         return None
 
-    # Create a custom model that uses OpenRouter
-    class OpenRouterModel(OpenAIModel):
-        def __init__(self, model_name=OPENROUTER_DEFAULT_MODEL):
-            super().__init__(
-                model_name,
-                base_url=OPENROUTER_BASE_URL,
-                api_key=openrouter_api_key
-            )
+    chosen = model_id or OPENROUTER_DEFAULT_MODEL
+    logger.info("Creating OpenRouter model: %s", chosen)
+    return OpenAIModel(chosen, base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key)
 
-    return OpenRouterModel(OPENROUTER_DEFAULT_MODEL)
+async def run_agent(question: str, preset: str | None = None):
+    """Run the agent with a specific question.
 
-async def run_agent(question: str):
-    """Run the agent with a specific question."""
+    Args:
+        question: The user's Pine Script question.
+        preset:   Optional model preset name (``codex``, ``opus``, ``flash``)
+                  or a raw OpenRouter model ID (e.g. ``anthropic/claude-opus-4-6``).
+                  When omitted the agent falls back to OpenRouter default or OpenAI.
+    """
     logger.info("Running agent with question: %s", question)
 
-    # Initialize OpenAI client with explicit key
     openai_api_key = get_openai_api_key()
     openai = AsyncOpenAI(api_key=openai_api_key)
-    logger.debug("OpenAI client initialized")
 
-    # Check if OpenRouter should be used
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     use_openrouter = bool(openrouter_api_key)
 
-    # Connect to database and run the agent
+    # Resolve model override from preset name or raw model ID
+    model_override = None
+    if preset:
+        from config import MODEL_PRESETS, get_preset
+        if preset in MODEL_PRESETS:
+            cfg = get_preset(preset)
+            model_override = create_openrouter_model(cfg["model"])
+            logger.info("Using preset '%s' → %s", preset, cfg["model"])
+        else:
+            # Treat as a raw OpenRouter model ID
+            model_override = create_openrouter_model(preset)
+            logger.info("Using raw model ID: %s", preset)
+
     try:
         async with database_connect(False) as pool:
-            logger.debug("Database connection ready")
-
-            # Create dependencies
             deps = Dependencies(
                 openai=openai,
                 pool=pool,
                 openrouter_api_key=openrouter_api_key,
-                use_openrouter=use_openrouter
+                use_openrouter=use_openrouter,
             )
 
-            # Override the model with OpenRouter if available
-            if use_openrouter:
-                logger.info("Using OpenRouter for queries")
-                try:
-                    openrouter_model = await create_openrouter_model()
-                    if openrouter_model:
-                        with pinescript_agent.override(model=openrouter_model):
-                            answer = await pinescript_agent.run(question, deps=deps)
-                    else:
-                        logger.warning("OpenRouter model creation failed, using default OpenAI model")
+            if model_override:
+                with pinescript_agent.override(model=model_override):
+                    answer = await pinescript_agent.run(question, deps=deps)
+            elif use_openrouter:
+                logger.info("Using OpenRouter default model")
+                or_model = create_openrouter_model()
+                if or_model:
+                    with pinescript_agent.override(model=or_model):
                         answer = await pinescript_agent.run(question, deps=deps)
-                except Exception as e:
-                    logger.warning("OpenRouter failed: %s, falling back to OpenAI", e)
+                else:
                     answer = await pinescript_agent.run(question, deps=deps)
             else:
                 logger.info("Using default OpenAI model")
                 answer = await pinescript_agent.run(question, deps=deps)
 
-            logger.debug("Agent response received")
             return answer
     except Exception as e:
         logger.error("Error running agent: %s", e)
