@@ -37,3 +37,6 @@ docs
 
 #chat history
 chat_history.pkl
+
+# RAGAS evaluation results (contain API responses, may be large)
+results/
