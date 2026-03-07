@@ -4,7 +4,12 @@ Replaces Crawl4AI with plain HTTP requests. TradingView docs are server-rendered
 so no JS execution is needed. Reuses the same chunking pipeline from rag_utils.
 
 Usage:
+    # Standard re-crawl (code-aware split, no LLM prefix):
     python pinescript_recrawl_light.py [--clear]
+
+    # Contextual re-crawl (code-aware split + LLM prefix per chunk):
+    python pinescript_recrawl_light.py --contextual [--clear]
+    # Cost: ~$5-10, Duration: ~20-30 min (1 LLM call per chunk via OpenRouter)
 """
 
 from __future__ import annotations
@@ -27,8 +32,24 @@ load_dotenv(override=True)
 # Import from existing project modules
 from db_schema import create_schema, run_migration  # noqa: E402
 from agent import database_connect  # noqa: E402
-from rag_utils import prepend_chunk_header, recursive_character_split  # noqa: E402
-from config import CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_MODEL  # noqa: E402
+from rag_utils import (  # noqa: E402
+    code_aware_split,
+    detect_content_type,
+    generate_contextual_prefix,
+    prepend_chunk_header,
+)
+from config import (  # noqa: E402
+    CHUNK_SIZE,
+    CHUNK_OVERLAP,
+    CONTEXTUAL_MODEL,
+    EMBEDDING_MODEL,
+    MAX_PAGE_CONTEXT_CHARS,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_DEFAULT_MODEL,
+)
+
+# --contextual flag: generate LLM context prefix per chunk (opt-in, costs ~$5-10)
+_CONTEXTUAL_MODE: bool = "--contextual" in sys.argv
 
 logging.basicConfig(
     level=logging.INFO,
@@ -106,9 +127,14 @@ async def fetch_page_markdown(client: httpx.AsyncClient, url: str) -> tuple[str,
 
 def split_into_sections(
     markdown: str, url: str, page_title: str
-) -> list[dict[str, str]]:
-    """Split markdown into chunks with headers — same logic as original crawler."""
-    sections: list[dict[str, str]] = []
+) -> list[dict]:
+    """Split markdown into chunks with headers, using code-aware chunking.
+
+    Returns dicts with keys: url, title, content, chunk_index, content_type.
+    The caller may later enrich `content` with a contextual prefix and set
+    `contextual_prefix` before inserting into the database.
+    """
+    sections: list[dict] = []
     lines = markdown.split("\n")
 
     # Remove page title line if present
@@ -151,11 +177,12 @@ def split_into_sections(
         if content:
             raw_sections.append({"title": page_title, "content": content})
 
-    # Second pass: recursive split + contextual headers
+    # Second pass: code-aware split + contextual headers + content type detection
     chunk_idx = 0
     for raw in raw_sections:
         section_title = raw["title"]
-        chunks = recursive_character_split(
+        # code_aware_split replaces recursive_character_split: preserves code blocks
+        chunks = code_aware_split(
             raw["content"], chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
         )
         for chunk in chunks:
@@ -168,6 +195,10 @@ def split_into_sections(
                     "url": f"{url}#{section_id}-{chunk_idx}",
                     "title": f"{page_title} - {section_title}",
                     "content": enriched,
+                    "raw_chunk": chunk,  # stored for contextual prefix generation
+                    "chunk_index": chunk_idx,
+                    "content_type": detect_content_type(chunk),
+                    "contextual_prefix": None,  # filled in process_and_store if --contextual
                 }
             )
             chunk_idx += 1
@@ -197,15 +228,42 @@ async def process_and_store(
     url: str,
     title: str,
     markdown: str,
+    contextual_client: AsyncOpenAI | None = None,
 ) -> int:
-    """Process a page: split → embed → insert. Returns chunk count."""
+    """Process a page: split → (optional contextual prefix) → embed → upsert.
+
+    Returns chunk count stored.
+    """
     sections = split_into_sections(markdown, url, title)
     if not sections:
         return 0
 
     inserted = 0
     for section in sections:
-        embedding_text = f"title: {section['title']}\n\ncontent: {section['content']}"
+        raw_chunk = section.get("raw_chunk", section["content"])
+        embed_content = section["content"]  # default: header + chunk
+        contextual_prefix: str | None = None
+
+        # Tier 2: LLM contextual prefix (opt-in via --contextual)
+        if _CONTEXTUAL_MODE and contextual_client is not None:
+            async with sem:
+                try:
+                    prefix = await generate_contextual_prefix(
+                        chunk=raw_chunk,
+                        page_title=title,
+                        full_page_content=markdown,
+                        openai_client=contextual_client,
+                        model=CONTEXTUAL_MODEL,
+                    )
+                    contextual_prefix = prefix
+                    # Enriched content used for embedding: context marker + chunk
+                    embed_content = f"[Context: {prefix}]\n\n{raw_chunk}"
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Contextual prefix failed for %s: %s", url, exc)
+                    # Fall back to header-enriched content
+                    embed_content = section["content"]
+
+        embedding_text = f"title: {section['title']}\n\ncontent: {embed_content}"
         embedding = await generate_embedding(openai_client, embedding_text, sem)
         if not embedding:
             continue
@@ -213,15 +271,27 @@ async def process_and_store(
         embedding_json = pydantic_core.to_json(embedding).decode()
         await pool.execute(
             """
-            INSERT INTO pinescript_docs (url, title, content, embedding, search_vector)
+            INSERT INTO pinescript_docs
+              (url, title, content, embedding, search_vector,
+               chunk_index, content_type, contextual_prefix)
             VALUES ($1, $2, $3, $4,
-                    to_tsvector('english', coalesce($2, '') || ' ' || coalesce($3, '')))
-            ON CONFLICT (url) DO NOTHING
+                    to_tsvector('english', coalesce($2, '') || ' ' || coalesce($3, '')),
+                    $5, $6, $7)
+            ON CONFLICT (url) DO UPDATE SET
+              content           = EXCLUDED.content,
+              embedding         = EXCLUDED.embedding,
+              search_vector     = EXCLUDED.search_vector,
+              chunk_index       = EXCLUDED.chunk_index,
+              content_type      = EXCLUDED.content_type,
+              contextual_prefix = EXCLUDED.contextual_prefix
             """,
             section["url"],
             section["title"],
             section["content"],
             embedding_json,
+            section["chunk_index"],
+            section["content_type"],
+            contextual_prefix,
         )
         inserted += 1
 
@@ -244,8 +314,23 @@ async def run_recrawl() -> None:
         logger.error("OPENAI_API_KEY not set")
         sys.exit(1)
 
+    # Embedding client — always uses OpenAI directly
     openai_client = AsyncOpenAI(api_key=openai_api_key)
     sem = asyncio.Semaphore(5)
+
+    # Contextual prefix client — uses OpenRouter for cheaper LLM access
+    contextual_client: AsyncOpenAI | None = None
+    if _CONTEXTUAL_MODE:
+        openrouter_key = os.getenv("OPENROUTER_API_KEY") or openai_api_key
+        contextual_client = AsyncOpenAI(
+            api_key=openrouter_key,
+            base_url=OPENROUTER_BASE_URL,
+        )
+        logger.info(
+            "Contextual mode ENABLED — model: %s, max_page_chars: %d",
+            CONTEXTUAL_MODEL,
+            MAX_PAGE_CONTEXT_CHARS,
+        )
 
     async with httpx.AsyncClient(
         headers={"User-Agent": "PineScriptDocsCrawler/1.0"},
@@ -276,7 +361,8 @@ async def run_recrawl() -> None:
                         continue
 
                     chunks = await process_and_store(
-                        pool, openai_client, sem, url, title, markdown
+                        pool, openai_client, sem, url, title, markdown,
+                        contextual_client=contextual_client,
                     )
                     total_chunks += chunks
                     logger.info("  → %d chunks stored (total: %d)", chunks, total_chunks)
