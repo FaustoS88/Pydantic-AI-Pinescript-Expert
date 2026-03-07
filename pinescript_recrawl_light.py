@@ -45,7 +45,6 @@ from config import (  # noqa: E402
     EMBEDDING_MODEL,
     MAX_PAGE_CONTEXT_CHARS,
     OPENROUTER_BASE_URL,
-    OPENROUTER_DEFAULT_MODEL,
 )
 
 # --contextual flag: generate LLM context prefix per chunk (opt-in, costs ~$5-10)

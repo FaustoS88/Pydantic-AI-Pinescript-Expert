@@ -12,7 +12,7 @@ from __future__ import annotations
 import sys
 import os
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # Make project root importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
