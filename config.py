@@ -38,7 +38,7 @@ SIMILARITY_THRESHOLD = float(os.getenv("PINESCRIPT_SIMILARITY_THRESHOLD", "0.3")
 RETRIEVAL_CANDIDATES = int(os.getenv("PINESCRIPT_RETRIEVAL_CANDIDATES", "15"))
 
 # Final results after reranking
-RERANK_TOP_N = int(os.getenv("PINESCRIPT_RERANK_TOP_N", "5"))
+RERANK_TOP_N = int(os.getenv("PINESCRIPT_RERANK_TOP_N", "15"))
 
 # Cross-encoder model for reranking
 RERANK_MODEL = os.getenv(
@@ -49,8 +49,8 @@ RERANK_MODEL = os.getenv(
 MMR_LAMBDA = float(os.getenv("PINESCRIPT_MMR_LAMBDA", "0.7"))
 
 # Chunking parameters
-CHUNK_SIZE = int(os.getenv("PINESCRIPT_CHUNK_SIZE", "500"))
-CHUNK_OVERLAP = int(os.getenv("PINESCRIPT_CHUNK_OVERLAP", "50"))
+CHUNK_SIZE = int(os.getenv("PINESCRIPT_CHUNK_SIZE", "1000"))
+CHUNK_OVERLAP = int(os.getenv("PINESCRIPT_CHUNK_OVERLAP", "100"))
 
 # ---------------------------------------------------------------------------
 # OpenRouter settings

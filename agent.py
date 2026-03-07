@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
 from dotenv import load_dotenv
 
 from config import (
@@ -114,7 +115,7 @@ class Dependencies:
 pinescript_agent = Agent(
     DEFAULT_MODEL,
     deps_type=Dependencies,
-    result_type=PineScriptResult,
+    output_type=PineScriptResult,
     system_prompt=(
         "You are a Pine Script v6 expert assistant. Pine Script is the programming language used in TradingView "
         "for creating custom indicators and strategies for technical analysis of financial markets. "
@@ -231,7 +232,8 @@ def create_openrouter_model(model_id: str | None = None):
 
     chosen = model_id or OPENROUTER_DEFAULT_MODEL
     logger.info("Creating OpenRouter model: %s", chosen)
-    return OpenAIModel(chosen, base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key)
+    provider = OpenAIProvider(base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key)
+    return OpenAIModel(chosen, provider=provider)
 
 async def run_agent(question: str, preset: str | None = None):
     """Run the agent with a specific question.
@@ -304,8 +306,8 @@ async def main():
 
     if result:
         print("\nResponse:")
-        print(result.data.response)
-        print(f"\nSnippets used: {result.data.snippets_used}")
+        print(result.output.response)
+        print(f"\nSnippets used: {result.output.snippets_used}")
     else:
         print("No response received from the agent.")
 
