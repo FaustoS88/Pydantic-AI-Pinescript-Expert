@@ -14,8 +14,6 @@ import logging
 import os
 import re
 import sys
-from typing import Any
-
 import asyncpg
 import html2text
 import httpx
