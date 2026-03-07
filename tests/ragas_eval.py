@@ -11,7 +11,7 @@ Prerequisites:
     OPENAI_API_KEY env var (real OpenAI key, not OpenRouter)
     OPENROUTER_API_KEY env var (for answer generation)
     DATABASE_URL pointing to the pinescript_docs database
-    (or VPS tunnel: ssh -L 5433:localhost:55432 root@167.235.150.184)
+    (or VPS tunnel: ssh -L 5433:localhost:55432 root@<your-vps-host>)
 """
 
 from __future__ import annotations
@@ -385,8 +385,8 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
         logger.error(
             "Cannot connect to database. "
             "If using VPS, open an SSH tunnel first:\n"
-            "  ssh -L 5433:localhost:55432 root@167.235.150.184\n"
-            "Then set: DATABASE_URL=postgresql://ragna_admin:<pass>@localhost:5433/ragnablock_pinescript\n"
+            "  ssh -L 5433:localhost:55432 root@<your-vps-host>\n"
+            "Then set: DATABASE_URL=postgresql://<user>:<pass>@localhost:5433/<dbname>\n"
             "Error: %s",
             exc,
         )

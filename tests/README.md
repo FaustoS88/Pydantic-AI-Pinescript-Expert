@@ -36,10 +36,10 @@ The evaluation connects to the `pinescript_docs` PostgreSQL/pgvector database.
 
 ```bash
 # Open tunnel in a separate terminal and leave it running
-ssh -L 5433:localhost:55432 root@167.235.150.184
+ssh -L 5433:localhost:55432 root@<your-vps-host>
 
 # Then set DATABASE_URL in your shell
-export DATABASE_URL=postgresql://ragna_admin:<password>@localhost:5433/ragnablock_pinescript
+export DATABASE_URL=postgresql://<user>:<password>@localhost:5433/<dbname>
 ```
 
 **Option B — Local Docker:**

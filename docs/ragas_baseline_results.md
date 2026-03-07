@@ -5,7 +5,7 @@
 - **Retrieval**: L2 vector search (`<->`) — 8 results, no threshold, no reranking
 - **Generation**: openai/gpt-4.1-mini (via OpenRouter)
 - **Judge**: gpt-4.1-mini (via OpenAI direct)
-- **DB**: VPS ragnablock_pinescript (1,148 old-style chunks, no headers, no recursive chunking)
+- **DB**: PostgreSQL pinescript_docs table (1,148 old-style chunks, no headers, no recursive chunking)
 - **Metrics**: Faithfulness (working), ContextRelevance (failed — `agenerate_text` bug in RAGAS 0.4)
 
 ## Overall Results
