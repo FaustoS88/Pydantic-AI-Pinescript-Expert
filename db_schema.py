@@ -13,7 +13,10 @@ CREATE TABLE IF NOT EXISTS pinescript_docs (
   title text NOT NULL,
   content text NOT NULL,
   embedding vector(1536) NOT NULL,
-  search_vector tsvector
+  search_vector tsvector,
+  chunk_index       INTEGER DEFAULT 0,
+  content_type      TEXT    DEFAULT 'reference',
+  contextual_prefix TEXT
 );
 
 -- Use cosine ops (not L2) — OpenAI embeddings are normalized for cosine similarity
@@ -51,6 +54,11 @@ CREATE INDEX IF NOT EXISTS idx_pinescript_docs_search
 DROP INDEX IF EXISTS idx_pinescript_docs_embedding;
 CREATE INDEX IF NOT EXISTS idx_pinescript_docs_embedding
   ON pinescript_docs USING hnsw (embedding vector_cosine_ops);
+
+-- Tier 2: metadata columns (idempotent)
+ALTER TABLE pinescript_docs ADD COLUMN IF NOT EXISTS chunk_index       INTEGER DEFAULT 0;
+ALTER TABLE pinescript_docs ADD COLUMN IF NOT EXISTS content_type      TEXT    DEFAULT 'reference';
+ALTER TABLE pinescript_docs ADD COLUMN IF NOT EXISTS contextual_prefix TEXT;
 """
 
 # Function to validate the schema (can be called to ensure DB is ready)

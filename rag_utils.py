@@ -1,11 +1,14 @@
 """Advanced RAG utilities — hybrid search, cross-encoder reranking, MMR deduplication.
 
-This module implements Tier 1 RAG improvements:
+This module implements Tier 1 and Tier 2 RAG improvements:
 - Reciprocal Rank Fusion (RRF) for hybrid BM25 + vector search
 - Cross-encoder reranking with sentence-transformers
 - Maximal Marginal Relevance (MMR) for result diversity
 - Recursive character splitting with overlap
 - Contextual chunk headers
+- [Tier 2] Code-aware chunking (never splits inside fenced code blocks)
+- [Tier 2] Contextual Retrieval — LLM-generated prefix per chunk (Anthropic, Sep 2024)
+- [Tier 2] Content type detection (reference / example / tutorial)
 """
 
 from __future__ import annotations
@@ -19,7 +22,10 @@ import numpy as np
 from config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
+    CONTEXTUAL_MODEL,
+    CONTEXTUAL_RETRIEVAL_ENABLED,
     HYBRID_SEARCH_ALPHA,
+    MAX_PAGE_CONTEXT_CHARS,
     MMR_LAMBDA,
     RERANK_MODEL,
     RERANK_TOP_N,
@@ -494,3 +500,192 @@ async def hybrid_retrieve(
         docs = docs[:top_n]
 
     return docs
+
+
+# ---------------------------------------------------------------------------
+# Tier 2A. Code-aware chunking — never splits inside fenced code blocks
+# ---------------------------------------------------------------------------
+
+
+def code_aware_split(
+    text: str,
+    chunk_size: int = CHUNK_SIZE,
+    chunk_overlap: int = CHUNK_OVERLAP,
+) -> list[str]:
+    """Split text while preserving fenced code blocks intact.
+
+    Fenced code blocks (``` ... ```) are NEVER split even if they exceed
+    chunk_size.  Prose sections delegate to _split_recursive for normal
+    hierarchical splitting.  Inline code (single backtick) is treated as prose.
+
+    Algorithm:
+    1. Parse text into alternating ('prose', ...) / ('code', ...) segments
+       by splitting on triple-backtick boundaries.
+    2. Greedily accumulate segments into a working chunk.
+    3. When a prose segment would overflow: flush current chunk, split prose
+       with _split_recursive, continue.
+    4. When a code segment would overflow: flush current chunk, emit the code
+       block as its own chunk (intact, even if oversized).
+
+    Args:
+        text: Source text (may contain fenced code blocks).
+        chunk_size: Target maximum chunk size in characters.
+        chunk_overlap: Characters of overlap to add between adjacent chunks.
+
+    Returns:
+        List of text chunks.
+    """
+    if not text or not text.strip():
+        return []
+
+    text = text.strip()
+    if len(text) <= chunk_size:
+        return [text]
+
+    # Split on ``` boundaries; even-index parts are prose, odd-index are code
+    parts = text.split("```")
+    segments: list[tuple[str, str]] = []
+    for i, part in enumerate(parts):
+        if not part:
+            continue
+        if i % 2 == 0:
+            segments.append(("prose", part))
+        else:
+            # Reconstruct the fenced block with its language tag
+            segments.append(("code", "```" + part + "```"))
+
+    if not segments:
+        return [text]
+
+    chunks: list[str] = []
+    current = ""
+
+    for seg_type, seg_content in segments:
+        if seg_type == "code":
+            candidate = current + seg_content
+            if len(candidate) <= chunk_size:
+                current = candidate
+            else:
+                # Flush current prose first, then emit code block whole
+                if current.strip():
+                    chunks.append(current.strip())
+                    current = ""
+                chunks.append(seg_content.strip())
+        else:
+            # Prose segment
+            candidate = current + seg_content
+            if len(candidate) <= chunk_size:
+                current = candidate
+            else:
+                # Flush current chunk
+                if current.strip():
+                    chunks.append(current.strip())
+                    current = ""
+                # Recursively split the prose segment
+                sub = _split_recursive(seg_content.strip(), _SEPARATORS, chunk_size, chunk_overlap)
+                if sub:
+                    # Keep the last sub-chunk as the new current to allow
+                    # subsequent content to be appended (maintain continuity)
+                    chunks.extend(sub[:-1])
+                    current = sub[-1]
+
+    if current.strip():
+        chunks.append(current.strip())
+
+    return [c for c in chunks if c.strip()]
+
+
+# ---------------------------------------------------------------------------
+# Tier 2B. Contextual Retrieval — LLM-generated prefix per chunk
+# ---------------------------------------------------------------------------
+
+
+async def generate_contextual_prefix(
+    chunk: str,
+    page_title: str,
+    full_page_content: str,
+    openai_client,
+    model: str = CONTEXTUAL_MODEL,
+) -> str:
+    """Generate a one-sentence LLM context description for a chunk.
+
+    Implements Anthropic's Contextual Retrieval approach (Sep 2024):
+    -49% retrieval failures standalone, -67% combined with reranking.
+
+    The returned string is the raw prefix sentence (NOT the enriched content).
+    The caller is responsible for:
+      1. Prepending "[Context: {prefix}]\\n\\n" to the chunk for embedding.
+      2. Storing the prefix separately in the `contextual_prefix` DB column.
+
+    On LLM failure: returns the page_title as a minimal fallback prefix so
+    indexing never crashes.
+
+    Args:
+        chunk: The chunk text to contextualise (first 600 chars used in prompt).
+        page_title: Title of the source page.
+        full_page_content: Full page markdown (truncated to MAX_PAGE_CONTEXT_CHARS).
+        openai_client: AsyncOpenAI-compatible client (any OpenAI-compatible API).
+        model: LLM model to use for prefix generation.
+
+    Returns:
+        A concise 1-sentence description of the chunk (30-80 words).
+    """
+    page_excerpt = full_page_content[:MAX_PAGE_CONTEXT_CHARS]
+    prompt = (
+        "Here is a page from the PineScript v5 documentation.\n"
+        f"Page title: {page_title}\n"
+        f"Page content (excerpt):\n{page_excerpt}\n\n"
+        f"Here is a specific chunk from this page:\n{chunk[:600]}\n\n"
+        "Write one concise sentence (30-80 words) describing what this chunk covers. "
+        "Be specific: name the function, concept, or language feature. "
+        'Start with "PineScript" or the function name. Reply with ONLY the sentence.'
+    )
+
+    try:
+        resp = await openai_client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=120,
+            temperature=0.1,
+        )
+        prefix = resp.choices[0].message.content.strip()
+        return prefix if prefix else page_title
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("generate_contextual_prefix: LLM call failed, using fallback: %s", exc)
+        return page_title
+
+
+# ---------------------------------------------------------------------------
+# Tier 2C. Content type detection
+# ---------------------------------------------------------------------------
+
+
+def detect_content_type(content: str) -> str:
+    """Classify chunk content as 'reference', 'example', or 'tutorial'.
+
+    Heuristic rules based on code block density and keyword presence:
+    - 'example'   : 2+ code blocks AND short (<200 words)  — code-heavy snippet
+    - 'reference' : param/syntax keywords AND at least 1 code block — API ref
+    - 'tutorial'  : everything else — explanatory prose
+
+    Args:
+        content: The chunk text.
+
+    Returns:
+        One of: 'reference', 'example', 'tutorial'.
+    """
+    if not content:
+        return "tutorial"
+
+    code_blocks = content.count("```") // 2
+    has_param_keywords = any(
+        k in content.lower()
+        for k in ["parameter", "argument", "syntax", "returns", "return type"]
+    )
+    word_count = len(content.split())
+
+    if code_blocks >= 2 and word_count < 200:
+        return "example"
+    if has_param_keywords and code_blocks >= 1:
+        return "reference"
+    return "tutorial"
