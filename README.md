@@ -203,6 +203,52 @@ python db_inspect.py view 508
 python db_inspect.py search "how to use request.security for different timeframes"
 ```
 
+## RAG Pipeline — Evaluation Results
+
+The retrieval pipeline has been systematically improved across two tiers and measured with
+[RAGAS](https://docs.ragas.io/) (40-question test set, categories: function lookup, conceptual,
+code generation, complex multi-concept).
+
+| Pipeline | Faithfulness | Context Relevance | vs Baseline |
+|----------|-------------|-------------------|-------------|
+| Baseline (flat chunks, L2 search) | 0.779 | n/a | — |
+| **Tier 1** (hybrid search, MMR, recursive chunking) | 0.774 | — | -0.6% |
+| **Tier 2** (+ Anthropic Contextual Retrieval) | **0.833** | **0.919** | **+6.9%** |
+
+**Code generation improved from 0.51 → 0.64 (+21%)** with Tier 2. Context Relevance 0.919 means
+the retriever finds the right chunks 92% of the time — the remaining gap is a content problem
+(docs lack complete strategy templates), not a retrieval problem.
+
+**Tier 1 improvements** ([docs](docs/RAG_IMPROVEMENTS.md)):
+hybrid BM25+vector search, similarity threshold, cross-encoder reranking, recursive chunking with overlap, MMR deduplication, contextual chunk headers
+
+**Tier 2 improvements** ([docs](docs/RAG_IMPROVEMENTS_TIER2.md)):
+code-aware chunking (fenced blocks never split), Anthropic Contextual Retrieval (LLM prefix per chunk at crawl time), content type detection, metadata columns
+
+**Evaluation details:** [Tier 1](docs/ragas_tier1_comparison.md) | [Tier 2](docs/ragas_tier2_comparison.md)
+
+### Running RAGAS Evaluation
+
+```bash
+# Tier 1 retrieval (hybrid + MMR)
+python tests/ragas_eval.py --retrieval tier1 --output results/tier1_YYYYMMDD.json
+
+# Baseline retrieval (L2 only)
+python tests/ragas_eval.py --retrieval baseline --output results/baseline_YYYYMMDD.json
+```
+
+### Running the Contextual Re-Crawl (Tier 2 activation)
+
+```bash
+# Standard re-crawl (code-aware split, free)
+python pinescript_recrawl_light.py --clear
+
+# Contextual re-crawl (LLM prefix per chunk — ~$8, ~2h for 4,910 chunks)
+python pinescript_recrawl_light.py --contextual --clear
+```
+
+---
+
 ## Key Components
 
 - **`agent.py`**: Core agent implementation with RAG capabilities

@@ -33,7 +33,6 @@ postgres-data/
 #pinescript docs
 pinescript_docs
 test_results
-docs
 
 #chat history
 chat_history.pkl
