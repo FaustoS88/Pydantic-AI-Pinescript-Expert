@@ -61,12 +61,12 @@ class RetrievedDoc:
 def prepend_chunk_header(page_title: str, section_title: str, content: str) -> str:
     """Prepend document context to a chunk for better embedding quality.
 
-    Format: "Document: PineScript v5 Reference | Section: {page_title} > {section}\n\n{content}"
+    Format: "Document: PineScript v6 Reference | Section: {page_title} > {section}\n\n{content}"
     """
     if section_title and section_title != page_title:
-        header = f"Document: PineScript v5 Reference | Section: {page_title} > {section_title}"
+        header = f"Document: PineScript v6 Reference | Section: {page_title} > {section_title}"
     else:
-        header = f"Document: PineScript v5 Reference | Section: {page_title}"
+        header = f"Document: PineScript v6 Reference | Section: {page_title}"
     return f"{header}\n\n{content}"
 
 
@@ -631,7 +631,7 @@ async def generate_contextual_prefix(
     """
     page_excerpt = full_page_content[:MAX_PAGE_CONTEXT_CHARS]
     prompt = (
-        "Here is a page from the PineScript v5 documentation.\n"
+        "Here is a page from the PineScript v6 documentation.\n"
         f"Page title: {page_title}\n"
         f"Page content (excerpt):\n{page_excerpt}\n\n"
         f"Here is a specific chunk from this page:\n{chunk[:600]}\n\n"
