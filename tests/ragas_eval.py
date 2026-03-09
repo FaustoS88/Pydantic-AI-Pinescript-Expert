@@ -399,6 +399,23 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
 
     retrieve_fn = retrieve_contexts_tier1 if retrieval_mode == "tier1" else retrieve_contexts_baseline
 
+    # Partial save: written after every question so we never lose progress on crash
+    RESULTS_DIR.mkdir(exist_ok=True)
+    partial_path = output_path.with_suffix(".partial.json")
+
+    def _save_partial() -> None:
+        partial_data = [
+            {
+                "question": q,
+                "answer": a,
+                "contexts": c,
+                "item": item,
+            }
+            for q, a, c, item in zip(questions, answers, contexts, items)
+        ]
+        with open(partial_path, "w") as fh:
+            json.dump(partial_data, fh, indent=2, default=str)
+
     async with httpx.AsyncClient() as http_client:
         try:
             for i, entry in enumerate(testset, 1):
@@ -424,6 +441,8 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
                         "num_contexts": len(ctx_chunks),
                     }
                 )
+                # Save partial after every question
+                _save_partial()
         finally:
             await pool.close()
 
@@ -448,10 +467,14 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
         "results": report,
     }
 
-    RESULTS_DIR.mkdir(exist_ok=True)
     with open(output_path, "w") as fh:
         json.dump(output, fh, indent=2, default=str)
     logger.info("Results saved to %s", output_path)
+
+    # Clean up partial file on successful completion
+    if partial_path.exists():
+        partial_path.unlink()
+        logger.info("Partial file cleaned up: %s", partial_path)
 
     print_report(report, meta)
 
