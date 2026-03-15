@@ -1,5 +1,10 @@
 # PineScript Expert
 
+[![GitHub Stars](https://img.shields.io/github/stars/FaustoS88/Pydantic-AI-Pinescript-Expert?style=social)](https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert)
+[![GitHub Forks](https://img.shields.io/github/forks/FaustoS88/Pydantic-AI-Pinescript-Expert?style=social)](https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert/network/members)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serves as an expert on Pine Script v6, TradingView's programming language for custom indicators and strategies. This agent leverages vector search technology and large language models to provide accurate, context-aware answers and generate working code examples.
 
 ## Features
@@ -302,6 +307,14 @@ Configure database settings in the `.env` file:
 ```
 DATABASE_URL=postgresql://username:password@hostname:port/database
 ```
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=FaustoS88/Pydantic-AI-Pinescript-Expert&type=Date)](https://star-history.com/#FaustoS88/Pydantic-AI-Pinescript-Expert&Date)
+
+## Contributors
+
+[![Contributors](https://contrib.rocks/image?repo=FaustoS88/Pydantic-AI-Pinescript-Expert)](https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert/graphs/contributors)
+
 ## Contributing
 
 Contributions are welcome!
