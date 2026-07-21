@@ -87,6 +87,12 @@ DEFAULT_DATABASE_URL = os.getenv(
 )
 
 # ---------------------------------------------------------------------------
+# Pydantic AI v2 — Thinking capability
+# ---------------------------------------------------------------------------
+
+THINKING_EFFORT = os.getenv("PINESCRIPT_THINKING_EFFORT", "high")  # low | medium | high
+
+# ---------------------------------------------------------------------------
 # Model presets — quick switch for testing with different providers
 # ---------------------------------------------------------------------------
 

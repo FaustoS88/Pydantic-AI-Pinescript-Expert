@@ -90,7 +90,7 @@ async def run_command(command, args):
 
         if result:
             print("\nResponse:")
-            print(result.data.response)
+            print(result.output.response)
             
     elif command == "populate":
         if not args:

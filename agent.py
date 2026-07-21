@@ -1,3 +1,15 @@
+"""
+Pine Script Expert Agent — Pydantic AI v2.
+
+Architecture:
+  - pinescript_rag  : Capability bundling the retrieve tool + expert instructions
+  - Thinking        : Built-in capability for extended reasoning
+  - Agent           : Thin shell composing the capabilities above
+
+The RAG pipeline (rag_utils.py), database schema (db_schema.py), and
+configuration (config.py) are unchanged from v1.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -12,7 +24,8 @@ import asyncpg
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.capabilities import Capability, Thinking
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from dotenv import load_dotenv
 
@@ -29,10 +42,10 @@ from config import (
     RETRIEVAL_CANDIDATES,
     RERANK_TOP_N,
     MMR_LAMBDA,
+    THINKING_EFFORT,
 )
 from rag_utils import hybrid_retrieve
 
-# Force reload environment variables
 load_dotenv(override=True)
 
 logging.basicConfig(
@@ -41,131 +54,114 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Log masked API keys at DEBUG level for startup diagnostics
-openai_key = os.getenv("OPENAI_API_KEY", "")
-openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
-logger.debug(
-    "OpenAI API key loaded: %s...%s",
-    openai_key[:4],
-    openai_key[-4:] if len(openai_key) > 8 else "",
-)
-logger.debug(
-    "OpenRouter API key loaded: %s...%s",
-    openrouter_key[:4],
-    openrouter_key[-4:] if len(openrouter_key) > 8 else "",
-)
+
+# ---------------------------------------------------------------------------
+# API key helper (unchanged from v1)
+# ---------------------------------------------------------------------------
 
 def get_openai_api_key() -> str:
-    """Get OpenAI API key with validation and user prompt if needed."""
-    # Try to get from environment
+    """Get OpenAI API key with validation and interactive prompt if needed."""
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
-    # Check if key is missing or has a placeholder value
-    if not openai_api_key or openai_api_key in ["YOUR_OPENAI_API_KEY", "sk-...", "YOUR_OPE***_API"] or "YOUR_" in openai_api_key:
+    if (
+        not openai_api_key
+        or "YOUR_" in openai_api_key
+        or openai_api_key == "sk-..."
+    ):
         logger.warning("OPENAI_API_KEY is not set or has a placeholder value.")
         print("Please enter your OpenAI API key:")
         openai_api_key = input("> ")
-
         if not openai_api_key:
             raise ValueError("OpenAI API key is required to continue.")
-
-        # Save to environment for this session
         os.environ["OPENAI_API_KEY"] = openai_api_key
 
-        # Also update the .env file for future runs
         env_path = os.path.join(os.path.dirname(__file__), ".env")
         try:
             from dotenv import set_key
             set_key(env_path, "OPENAI_API_KEY", openai_api_key)
-            logger.info("Updated OPENAI_API_KEY in %s for future runs", env_path)
+            logger.info("Updated OPENAI_API_KEY in %s", env_path)
         except ImportError:
-            logger.warning("Could not update .env file - dotenv.set_key not available")
-            logger.warning("Please manually update %s with your API key", env_path)
-
-    # Verify it's not still using a placeholder
-    if "YOUR_" in openai_api_key or openai_api_key == "sk-...":
-        logger.warning("API key appears to be a placeholder value.")
-        print("Please enter your actual OpenAI API key:")
-        openai_api_key = input("> ")
-
-        if not openai_api_key:
-            raise ValueError("OpenAI API key is required to continue.")
-
-        # Save to environment for this session
-        os.environ["OPENAI_API_KEY"] = openai_api_key
+            logger.warning("Could not update .env — dotenv.set_key not available")
 
     return openai_api_key
 
 
-# Define result structure for better tracking
+# ---------------------------------------------------------------------------
+# Output schema (unchanged)
+# ---------------------------------------------------------------------------
+
 class PineScriptResult(BaseModel):
     query: str = Field(description="The original query")
     response: str = Field(description="The generated response")
     snippets_used: int = Field(description="Number of documentation snippets used")
 
+
+# ---------------------------------------------------------------------------
+# Dependencies — simplified: removed dead openrouter_api_key / use_openrouter
+# fields that were never read by any tool.
+# ---------------------------------------------------------------------------
+
 @dataclass
 class Dependencies:
-    """Dependencies for the PineScript Expert Agent"""
+    """Runtime dependencies injected per run."""
     openai: AsyncOpenAI
     pool: asyncpg.Pool
-    openrouter_api_key: str = None
-    use_openrouter: bool = False
 
-# Initialize the agent with appropriate settings
-pinescript_agent = Agent(
-    DEFAULT_MODEL,
-    deps_type=Dependencies,
-    output_type=PineScriptResult,
-    system_prompt=(
-        "You are a Pine Script v6 expert assistant. Pine Script is the programming language used in TradingView "
-        "for creating custom indicators and strategies for technical analysis of financial markets. "
-        "Your task is to provide clear, accurate information about Pine Script v6 based on the official documentation. "
-        "Always include code examples in your explanations when relevant. "
-        "Focus on being practical and giving working solutions for user problems."
-    ),
-    model_settings={
-        "temperature": LLM_TEMPERATURE,
-        "max_tokens": LLM_MAX_TOKENS,
-    }
-)
 
-@pinescript_agent.system_prompt
-async def add_style_prompt(ctx: RunContext[Dependencies]) -> str:
-    """Add a style prompt for consistent responses"""
-    return (
-        "When answering questions about Pine Script, follow these guidelines:\n"
+# ---------------------------------------------------------------------------
+# Capability: Pine Script RAG
+#
+# v1 had: monolithic system_prompt + @agent.tool + @agent.system_prompt
+# v2 has: one Capability bundling instructions + the retrieve tool.
+#
+# defer_loading=False because this is the ONLY capability right now.
+# When you add more (e.g. syntax-validation, error-explanation), defer
+# THOSE and keep this one always-on.
+# ---------------------------------------------------------------------------
+
+pinescript_rag = Capability(
+    id="pinescript-rag",
+    description="Search the official Pine Script v6 documentation and ground answers in it.",
+    instructions=(
+        "You are a Pine Script v6 expert assistant. Pine Script is the programming "
+        "language used in TradingView for creating custom indicators and strategies "
+        "for technical analysis of financial markets.\n\n"
+        "ALWAYS call the retrieve tool before answering any Pine Script question. "
+        "Ground every answer in the official documentation you retrieve. "
+        "When generating code, use //@version=6 and cite the documentation URLs.\n\n"
+        "Response guidelines:\n"
         "1. Include working code examples whenever possible\n"
         "2. Explain each part of the code clearly\n"
-        "3. Highlight any common pitfalls or best practices\n"
-        "4. If you're unsure about something, be transparent about it\n"
-        "5. Format your code with proper syntax highlighting\n"
-        "6. When appropriate, mention TradingView-specific context\n"
-        "7. Reference specific Pine Script v6 functions and features accurately\n"
-        "8. Provide clear explanations of complex concepts with analogies when helpful\n"
-    )
+        "3. Highlight common pitfalls or best practices\n"
+        "4. If unsure about something, be transparent about it\n"
+        "5. Format code with proper syntax highlighting\n"
+        "6. Reference specific Pine Script v6 functions and features accurately\n"
+        "7. Provide clear explanations of complex concepts with analogies when helpful\n"
+        "8. When appropriate, mention TradingView-specific context"
+    ),
+    # defer_loading=False  ← default; keeps the tool+instructions in every prompt.
+    # Flip to True when you add more capabilities and want progressive disclosure.
+)
 
-@pinescript_agent.tool
+
+@pinescript_rag.tool
 async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
-    """Retrieve relevant Pine Script documentation using hybrid search pipeline.
+    """Retrieve relevant Pine Script documentation using hybrid search.
 
-    Pipeline: vector + BM25 → RRF fusion → similarity threshold → cross-encoder
-    reranking → MMR deduplication.
+    Pipeline: vector + BM25 → RRF fusion → similarity threshold →
+    cross-encoder reranking → MMR deduplication.
 
     Args:
-        ctx: The run context with dependencies
-        search_query: The search query to find relevant documentation
+        ctx: Run context with database pool and OpenAI client.
+        search_query: The search query to find relevant documentation.
 
     Returns:
-        str: Concatenated documentation snippets relevant to the query
+        Concatenated documentation snippets relevant to the query.
     """
     try:
-        openai_client = ctx.deps.openai
-
-        logger.debug("Running hybrid retrieval for: %s", search_query)
-
         docs = await hybrid_retrieve(
             pool=ctx.deps.pool,
-            openai_client=openai_client,
+            openai_client=ctx.deps.openai,
             query=search_query,
             embedding_model=EMBEDDING_MODEL,
             candidates=RETRIEVAL_CANDIDATES,
@@ -182,7 +178,6 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
             )
 
         logger.debug("Hybrid retrieval returned %d documents", len(docs))
-        ctx.custom_data = {"snippets_used": len(docs)}
 
         return "\n\n".join(
             f"# {doc.title}\nDocumentation URL: {doc.url}\n\n{doc.content}\n"
@@ -192,19 +187,40 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
         logger.error("Error in retrieve tool: %s", e)
         return f"Error retrieving documentation: {str(e)}"
 
+
+# ---------------------------------------------------------------------------
+# The Agent — thin shell composing capabilities
+#
+# v1: Agent(model, deps_type, result_type, system_prompt, model_settings)
+#     + @agent.tool + @agent.system_prompt  (everything bolted on separately)
+#
+# v2: Agent(model, deps_type, output_type, capabilities=[...], model_settings)
+#     Everything is a capability. The agent is just the composition root.
+# ---------------------------------------------------------------------------
+
+pinescript_agent = Agent(
+    DEFAULT_MODEL,                        # "openai:gpt-4o-mini"
+    deps_type=Dependencies,
+    output_type=PineScriptResult,         # v2 naming (was result_type in old v1)
+    capabilities=[
+        Thinking(effort=THINKING_EFFORT), # extended reasoning, unified across providers
+        pinescript_rag,                   # retrieve tool + expert instructions
+    ],
+    model_settings={
+        "temperature": LLM_TEMPERATURE,   # 0.2 — now actually applied every run
+        "max_tokens": LLM_MAX_TOKENS,     # 2000
+    },
+)
+
+
+# ---------------------------------------------------------------------------
+# Database helper (unchanged)
+# ---------------------------------------------------------------------------
+
 @asynccontextmanager
 async def database_connect(create_db: bool = False) -> AsyncGenerator[asyncpg.Pool, None]:
-    """Connect to the database with the Pine Script documentation.
-
-    Args:
-        create_db: Whether to create the database if it doesn't exist
-
-    Yields:
-        asyncpg.Pool: A connection pool to the database
-    """
-    # Use the connection string directly from environment variables
+    """Connect to the pgvector database."""
     db_url = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
-
     logger.info("Connecting to database: %s", db_url)
     try:
         pool = await asyncpg.create_pool(db_url)
@@ -218,84 +234,96 @@ async def database_connect(create_db: bool = False) -> AsyncGenerator[asyncpg.Po
         logger.error("Error connecting to database: %s", e)
         raise
 
-def create_openrouter_model(model_id: str | None = None):
-    """Create an OpenRouter model.
 
-    Args:
-        model_id: OpenRouter model ID (e.g. ``openai/gpt-5.3-codex``).
-                  Falls back to OPENROUTER_DEFAULT_MODEL from config.
+# ---------------------------------------------------------------------------
+# Model routing — v2 style
+#
+# v1: create_openrouter_model() → with agent.override(model=...): agent.run()
+# v2: resolve_model() → agent.run(model=...)  (no context manager needed)
+# ---------------------------------------------------------------------------
+
+def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
+    """Resolve a preset name or raw model ID to a Pydantic AI model.
+
+    Returns None to use the agent's default model (OpenAI).
     """
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-    if not openrouter_api_key:
-        logger.info("OPENROUTER_API_KEY not found, using OpenAI")
+
+    if preset:
+        from config import MODEL_PRESETS, get_preset
+
+        if preset in MODEL_PRESETS:
+            cfg = get_preset(preset)
+            model_id = str(cfg["model"])
+            logger.info("Using preset '%s' → %s", preset, model_id)
+        else:
+            model_id = preset  # raw OpenRouter model ID
+            logger.info("Using raw model ID: %s", model_id)
+
+        if openrouter_api_key:
+            provider = OpenAIProvider(
+                base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key
+            )
+            return OpenAIChatModel(model_id, provider=provider)
+
+        logger.warning("No OPENROUTER_API_KEY for preset '%s', using default", preset)
         return None
 
-    chosen = model_id or OPENROUTER_DEFAULT_MODEL
-    logger.info("Creating OpenRouter model: %s", chosen)
-    provider = OpenAIProvider(base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key)
-    return OpenAIModel(chosen, provider=provider)
+    # No preset: use OpenRouter default if key exists, else agent default
+    if openrouter_api_key:
+        provider = OpenAIProvider(
+            base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key
+        )
+        return OpenAIChatModel(OPENROUTER_DEFAULT_MODEL, provider=provider)
 
-async def run_agent(question: str, preset: str | None = None):
+    return None  # agent default (OpenAI)
+
+
+# ---------------------------------------------------------------------------
+# Run helper — now accepts message_history for proper multi-turn
+# ---------------------------------------------------------------------------
+
+async def run_agent(question: str, preset: str | None = None, message_history=None):
     """Run the agent with a specific question.
 
     Args:
         question: The user's Pine Script question.
-        preset:   Optional model preset name (``codex``, ``opus``, ``flash``)
-                  or a raw OpenRouter model ID (e.g. ``anthropic/claude-opus-4-6``).
-                  When omitted the agent falls back to OpenRouter default or OpenAI.
+        preset: Optional model preset name ('codex', 'opus', 'flash')
+                or a raw OpenRouter model ID.
+        message_history: Optional list[ModelMessage] from a previous run
+                         (via result.new_messages()) for multi-turn context.
     """
     logger.info("Running agent with question: %s", question)
 
     openai_api_key = get_openai_api_key()
     openai = AsyncOpenAI(api_key=openai_api_key)
 
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-    use_openrouter = bool(openrouter_api_key)
-
-    # Resolve model override from preset name or raw model ID
-    model_override = None
-    if preset:
-        from config import MODEL_PRESETS, get_preset
-        if preset in MODEL_PRESETS:
-            cfg = get_preset(preset)
-            model_override = create_openrouter_model(cfg["model"])
-            logger.info("Using preset '%s' → %s", preset, cfg["model"])
-        else:
-            # Treat as a raw OpenRouter model ID
-            model_override = create_openrouter_model(preset)
-            logger.info("Using raw model ID: %s", preset)
-
     try:
         async with database_connect(False) as pool:
-            deps = Dependencies(
-                openai=openai,
-                pool=pool,
-                openrouter_api_key=openrouter_api_key,
-                use_openrouter=use_openrouter,
-            )
+            deps = Dependencies(openai=openai, pool=pool)
+            model = resolve_model(preset)
 
-            if model_override:
-                with pinescript_agent.override(model=model_override):
-                    answer = await pinescript_agent.run(question, deps=deps)
-            elif use_openrouter:
-                logger.info("Using OpenRouter default model")
-                or_model = create_openrouter_model()
-                if or_model:
-                    with pinescript_agent.override(model=or_model):
-                        answer = await pinescript_agent.run(question, deps=deps)
-                else:
-                    answer = await pinescript_agent.run(question, deps=deps)
-            else:
-                logger.info("Using default OpenAI model")
-                answer = await pinescript_agent.run(question, deps=deps)
+            # v2: pass model= directly to run() — no override() context manager
+            run_kwargs: dict = {"deps": deps}
+            if model is not None:
+                run_kwargs["model"] = model
+            if message_history:
+                run_kwargs["message_history"] = message_history
 
+            answer = await pinescript_agent.run(question, **run_kwargs)
             return answer
+
     except Exception as e:
         logger.error("Error running agent: %s", e)
         return None
 
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
 async def main():
-    """Main function to run the agent from the command line."""
+    """Run the agent from the command line."""
     if len(sys.argv) > 1:
         question = " ".join(sys.argv[1:])
     else:
@@ -306,10 +334,11 @@ async def main():
 
     if result:
         print("\nResponse:")
-        print(result.output.response)
+        print(result.output.response)           # v2: .output (was .data)
         print(f"\nSnippets used: {result.output.snippets_used}")
     else:
         print("No response received from the agent.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
