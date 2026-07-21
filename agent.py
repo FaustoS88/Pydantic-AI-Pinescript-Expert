@@ -25,7 +25,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.capabilities import Capability, Thinking
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from dotenv import load_dotenv
 
@@ -242,7 +242,7 @@ async def database_connect(create_db: bool = False) -> AsyncGenerator[asyncpg.Po
 # v2: resolve_model() → agent.run(model=...)  (no context manager needed)
 # ---------------------------------------------------------------------------
 
-def resolve_model(preset: str | None = None) -> OpenAIModel | None:
+def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
     """Resolve a preset name or raw model ID to a Pydantic AI model.
 
     Returns None to use the agent's default model (OpenAI).
@@ -264,7 +264,7 @@ def resolve_model(preset: str | None = None) -> OpenAIModel | None:
             provider = OpenAIProvider(
                 base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key
             )
-            return OpenAIModel(model_id, provider=provider)
+            return OpenAIChatModel(model_id, provider=provider)
 
         logger.warning("No OPENROUTER_API_KEY for preset '%s', using default", preset)
         return None
@@ -274,7 +274,7 @@ def resolve_model(preset: str | None = None) -> OpenAIModel | None:
         provider = OpenAIProvider(
             base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key
         )
-        return OpenAIModel(OPENROUTER_DEFAULT_MODEL, provider=provider)
+        return OpenAIChatModel(OPENROUTER_DEFAULT_MODEL, provider=provider)
 
     return None  # agent default (OpenAI)
 
