@@ -14,8 +14,8 @@ This module implements Tier 1 and Tier 2 RAG improvements:
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Sequence
 
 import numpy as np
 
@@ -46,7 +46,7 @@ class RetrievedDoc:
     url: str
     title: str
     content: str
-    vector_score: float = 0.0  # cosine similarity (0–1)
+    vector_score: float = 0.0  # cosine similarity (0-1)
     bm25_score: float = 0.0  # ts_rank score
     rrf_score: float = 0.0  # fused score
     rerank_score: float = 0.0  # cross-encoder score
@@ -181,7 +181,7 @@ def rerank_docs(
     pairs = [[query, doc.content] for doc in docs]
     scores = encoder.predict(pairs)
 
-    for doc, score in zip(docs, scores):
+    for doc, score in zip(docs, scores, strict=True):
         doc.rerank_score = float(score)
 
     reranked = sorted(docs, key=lambda d: d.rerank_score, reverse=True)
@@ -270,9 +270,7 @@ def _split_recursive(
 
             # If this single part is too large, recurse with finer separators
             if len(part) > chunk_size and remaining_separators:
-                sub_chunks = _split_recursive(
-                    part, remaining_separators, chunk_size, chunk_overlap
-                )
+                sub_chunks = _split_recursive(part, remaining_separators, chunk_size, chunk_overlap)
                 chunks.extend(sub_chunks)
                 current = ""
             else:
@@ -446,9 +444,7 @@ async def hybrid_retrieve(
     import pydantic_core
 
     # 1. Generate query embedding
-    embedding_resp = await openai_client.embeddings.create(
-        input=query, model=embedding_model
-    )
+    embedding_resp = await openai_client.embeddings.create(input=query, model=embedding_model)
     query_embedding = embedding_resp.data[0].embedding
     embedding_json = pydantic_core.to_json(query_embedding).decode()
 
@@ -649,7 +645,7 @@ async def generate_contextual_prefix(
         )
         prefix = resp.choices[0].message.content.strip()
         return prefix if prefix else page_title
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("generate_contextual_prefix: LLM call failed, using fallback: %s", exc)
         return page_title
 
@@ -678,8 +674,7 @@ def detect_content_type(content: str) -> str:
 
     code_blocks = content.count("```") // 2
     has_param_keywords = any(
-        k in content.lower()
-        for k in ["parameter", "argument", "syntax", "returns", "return type"]
+        k in content.lower() for k in ["parameter", "argument", "syntax", "returns", "return type"]
     )
     word_count = len(content.split())
 

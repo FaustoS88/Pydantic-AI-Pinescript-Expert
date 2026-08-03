@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import fields
+
 import pytest
 from pydantic import ValidationError
 
-from agent import PineScriptResult, Dependencies
-
+from agent import Dependencies, PineScriptResult
 
 # ---------------------------------------------------------------------------
 # PineScriptResult — validation
 # ---------------------------------------------------------------------------
+
 
 class TestPineScriptResult:
     def test_valid_result(self) -> None:
@@ -24,9 +26,7 @@ class TestPineScriptResult:
         assert result.snippets_used == 3
 
     def test_zero_snippets(self) -> None:
-        result = PineScriptResult(
-            query="test", response="answer", snippets_used=0
-        )
+        result = PineScriptResult(query="test", response="answer", snippets_used=0)
         assert result.snippets_used == 0
 
     def test_missing_query_raises(self) -> None:
@@ -51,23 +51,17 @@ class TestPineScriptResult:
 
     def test_long_response(self) -> None:
         long_text = "x" * 50_000
-        result = PineScriptResult(
-            query="test", response=long_text, snippets_used=1
-        )
+        result = PineScriptResult(query="test", response=long_text, snippets_used=1)
         assert len(result.response) == 50_000
 
     def test_serialisation_roundtrip(self) -> None:
-        original = PineScriptResult(
-            query="plot question", response="use plot()", snippets_used=5
-        )
+        original = PineScriptResult(query="plot question", response="use plot()", snippets_used=5)
         data = original.model_dump()
         restored = PineScriptResult(**data)
         assert restored == original
 
     def test_json_roundtrip(self) -> None:
-        original = PineScriptResult(
-            query="test", response="answer", snippets_used=2
-        )
+        original = PineScriptResult(query="test", response="answer", snippets_used=2)
         json_str = original.model_dump_json()
         restored = PineScriptResult.model_validate_json(json_str)
         assert restored == original
@@ -77,21 +71,22 @@ class TestPineScriptResult:
 # Dependencies — dataclass init
 # ---------------------------------------------------------------------------
 
-class TestDependencies:
-    def test_default_values(self) -> None:
-        deps = Dependencies(openai=None, pool=None)  # type: ignore[arg-type]
-        assert deps.openrouter_api_key is None
-        assert deps.use_openrouter is False
 
-    def test_with_openrouter(self) -> None:
-        deps = Dependencies(
-            openai=None,  # type: ignore[arg-type]
-            pool=None,    # type: ignore[arg-type]
-            openrouter_api_key="sk-or-test",
-            use_openrouter=True,
-        )
-        assert deps.openrouter_api_key == "sk-or-test"
-        assert deps.use_openrouter is True
+class TestDependencies:
+    def test_only_openai_and_pool(self) -> None:
+        """v2 trimmed Dependencies to the two fields tools actually read."""
+        field_names = {f.name for f in fields(Dependencies)}
+        assert field_names == {"openai", "pool"}
+
+    def test_rejects_removed_openrouter_fields(self) -> None:
+        """Model routing moved to resolve_model(); these fields no longer exist."""
+        with pytest.raises(TypeError):
+            Dependencies(
+                openai=None,  # type: ignore[arg-type]
+                pool=None,  # type: ignore[arg-type]
+                openrouter_api_key="sk-or-test",  # type: ignore[call-arg]
+                use_openrouter=True,  # type: ignore[call-arg]
+            )
 
     def test_fields_accessible(self) -> None:
         deps = Dependencies(openai="mock_client", pool="mock_pool")  # type: ignore[arg-type]

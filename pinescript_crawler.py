@@ -3,29 +3,28 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import sys
 import re
-import pydantic_core
-from typing import List, Dict, Set
+import sys
+from datetime import UTC, datetime
 
 import asyncpg
-from openai import AsyncOpenAI
-from dotenv import load_dotenv
+import pydantic_core
 from bs4 import BeautifulSoup
-from datetime import datetime
 
 # Import crawler from crawl4ai
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
 
 # Force reload environment variables
 load_dotenv(override=True)
 
 # Import database setup functions
-from db_schema import create_schema, run_migration  # noqa: E402
 from agent import database_connect  # noqa: E402
+from config import CHUNK_OVERLAP, CHUNK_SIZE  # noqa: E402
+from db_schema import create_schema, run_migration  # noqa: E402
 from rag_utils import prepend_chunk_header, recursive_character_split  # noqa: E402
-from config import CHUNK_SIZE, CHUNK_OVERLAP  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,7 +41,7 @@ class PineScriptDocsCrawler:
         # This is the correct base URL that works in the original script
         self.base_url = "https://www.tradingview.com/pine-script-docs"
         self.output_dir = "pinescript_docs"
-        self.visited_urls: Set[str] = set()
+        self.visited_urls: set[str] = set()
 
         # Initialize OpenAI client for embeddings
         openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -66,27 +65,23 @@ class PineScriptDocsCrawler:
             "name": "PineScript Documentation",
             "baseSelector": "main",  # Main content area
             "fields": [
-                {
-                    "name": "title",
-                    "selector": "h1",
-                    "type": "text"
-                },
+                {"name": "title", "selector": "h1", "type": "text"},
                 {
                     "name": "content",
                     "selector": "main > div",  # Main content excluding navigation
-                    "type": "html"
+                    "type": "html",
                 },
                 {
                     "name": "navigation",
                     "selector": "nav",  # Left navigation menu
-                    "type": "html"
+                    "type": "html",
                 },
                 {
                     "name": "toc",
                     "selector": "[aria-label='Table of contents']",  # Right-side TOC
-                    "type": "html"
-                }
-            ]
+                    "type": "html",
+                },
+            ],
         }
 
         # Semaphore to limit concurrent embedding API calls
@@ -98,32 +93,31 @@ class PineScriptDocsCrawler:
             return ""
 
         # Remove anchor tags and query parameters
-        url = url.split('#')[0].split('?')[0]
+        url = url.split("#")[0].split("?")[0]
 
         # Skip external links and special protocols
-        if url.startswith(('http', 'https')) and not url.startswith(self.base_url):
+        if url.startswith(("http", "https")) and not url.startswith(self.base_url):
             return ""
-        if url.startswith(('mailto:', 'tel:', 'javascript:')):
+        if url.startswith(("mailto:", "tel:", "javascript:")):
             return ""
 
         # Handle relative URLs
-        if not url.startswith('http'):
-            if url.startswith('/'):
+        if not url.startswith("http"):
+            if url.startswith("/"):
                 url = f"https://www.tradingview.com{url}"
             else:
                 url = f"{self.base_url}/{url}"
 
         return url
 
-    async def get_all_doc_urls(self) -> List[str]:
+    async def get_all_doc_urls(self) -> list[str]:
         """Extract all documentation URLs from the navigation menu"""
         urls = set()
         logger.info("Starting to collect URLs...")
 
         # Start with main sections from left navigation
         browser_config = BrowserConfig(
-            headless=True,
-            extra_args=["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"]
+            headless=True, extra_args=["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"]
         )
 
         # THIS IS CRITICAL - the /welcome/ path is the entry point that works
@@ -134,13 +128,13 @@ class PineScriptDocsCrawler:
             result = await crawler.arun(url=welcome_url)
             if result.success:
                 logger.info("Successfully accessed the main page")
-                soup = BeautifulSoup(result.html, 'html.parser')
+                soup = BeautifulSoup(result.html, "html.parser")
 
                 # Find all navigation elements
-                nav_elements = soup.find_all(['nav', 'div'], class_=['toc', 'sidebar'])
+                nav_elements = soup.find_all(["nav", "div"], class_=["toc", "sidebar"])
                 for nav in nav_elements:
-                    for link in nav.find_all('a'):
-                        href = link.get('href')
+                    for link in nav.find_all("a"):
+                        href = link.get("href")
                         if href:
                             full_url = self.normalize_url(href)
                             if full_url:
@@ -156,13 +150,13 @@ class PineScriptDocsCrawler:
                 fallback_result = await crawler.arun(url=fallback_url)
                 if fallback_result.success:
                     logger.info("Successfully accessed fallback page")
-                    soup = BeautifulSoup(fallback_result.html, 'html.parser')
+                    soup = BeautifulSoup(fallback_result.html, "html.parser")
 
                     # Find all navigation elements
-                    nav_elements = soup.find_all(['nav', 'div'], class_=['toc', 'sidebar'])
+                    nav_elements = soup.find_all(["nav", "div"], class_=["toc", "sidebar"])
                     for nav in nav_elements:
-                        for link in nav.find_all('a'):
-                            href = link.get('href')
+                        for link in nav.find_all("a"):
+                            href = link.get("href")
                             if href:
                                 full_url = self.normalize_url(href)
                                 if full_url:
@@ -173,14 +167,20 @@ class PineScriptDocsCrawler:
         if not urls:
             logger.warning("No URLs found in navigation, trying common paths...")
             common_paths = [
-                "welcome/", "introduction/", "concepts/", "language/",
-                "essential/", "resources/", "reference/", "faq/"
+                "welcome/",
+                "introduction/",
+                "concepts/",
+                "language/",
+                "essential/",
+                "resources/",
+                "reference/",
+                "faq/",
             ]
 
             for path in common_paths:
                 urls.add(f"{self.base_url}/{path}")
 
-        urls_list = sorted(list(urls))
+        urls_list = sorted(urls)
         logger.info("Total URLs found: %d", len(urls_list))
         return urls_list
 
@@ -189,20 +189,20 @@ class PineScriptDocsCrawler:
     def clean_navigation(self, text):
         """Remove navigation elements and links"""
         # Remove navigation sections
-        text = re.sub(r'Version Version.*?Auto', '', text, flags=re.DOTALL)
-        text = re.sub(r'\* \[.*?\n', '', text)
-        text = re.sub(r'Copyright © .*?TradingView.*?\n', '', text)
-        text = re.sub(r'On this page.*?\n', '', text)
+        text = re.sub(r"Version Version.*?Auto", "", text, flags=re.DOTALL)
+        text = re.sub(r"\* \[.*?\n", "", text)
+        text = re.sub(r"Copyright © .*?TradingView.*?\n", "", text)
+        text = re.sub(r"On this page.*?\n", "", text)
         # Clean up additional navigation elements
-        text = re.sub(r'\[ User Manual \].*?\n', '', text)
-        text = re.sub(r'\[ Previous .*? \]', '', text)
-        text = re.sub(r'\[ Next .*? \]', '', text)
+        text = re.sub(r"\[ User Manual \].*?\n", "", text)
+        text = re.sub(r"\[ Previous .*? \]", "", text)
+        text = re.sub(r"\[ Next .*? \]", "", text)
         return text
 
     def extract_code_blocks(self, text):
         """Preserve and clean code blocks"""
         # Find Pine Script code blocks
-        code_blocks = re.findall(r'```(?:pine)?(.*?)```', text, re.DOTALL)
+        code_blocks = re.findall(r"```(?:pine)?(.*?)```", text, re.DOTALL)
         clean_blocks = []
         for block in code_blocks:
             # Clean the code block
@@ -214,13 +214,13 @@ class PineScriptDocsCrawler:
     def extract_function_docs(self, text):
         """Extract function documentation"""
         # Find function descriptions
-        functions = re.findall(r'@function.*?@returns.*?\n', text, re.DOTALL)
+        functions = re.findall(r"@function.*?@returns.*?\n", text, re.DOTALL)
         return functions
 
     def process_content(self, raw_content, url):
         """Process raw content into a cleaner format for embedding"""
         # Skip if no real content
-        if len(raw_content) < 100 or 'User Manual' not in raw_content:
+        if len(raw_content) < 100 or "User Manual" not in raw_content:
             return raw_content
 
         # Clean navigation and basic structure
@@ -231,16 +231,19 @@ class PineScriptDocsCrawler:
         function_docs = self.extract_function_docs(content)
 
         # Extract main content sections (Q&A format in FAQ)
-        sections = re.findall(r'##\s+\[(.*?)\].*?\n(.*?)(?=##|\Z)', content, re.DOTALL)
+        sections = re.findall(r"##\s+\[(.*?)\].*?\n(.*?)(?=##|\Z)", content, re.DOTALL)
 
         # Build processed content
         processed = []
 
         if sections:
             for title, section in sections:
-                if any(keyword in section.lower() for keyword in ['pine', 'script', 'function', 'indicator', 'value', 'parameter']):
-                    clean_section = re.sub(r'\[\^.*?\]', '', section)  # Remove footnotes
-                    clean_section = re.sub(r'\(https://.*?\)', '', clean_section)  # Remove links
+                if any(
+                    keyword in section.lower()
+                    for keyword in ["pine", "script", "function", "indicator", "value", "parameter"]
+                ):
+                    clean_section = re.sub(r"\[\^.*?\]", "", section)  # Remove footnotes
+                    clean_section = re.sub(r"\(https://.*?\)", "", clean_section)  # Remove links
                     processed.append(f"## {title}\n{clean_section.strip()}")
 
         if code_blocks:
@@ -257,7 +260,7 @@ class PineScriptDocsCrawler:
 
         return "\n\n".join(processed)
 
-    async def generate_embedding(self, text: str) -> List[float]:
+    async def generate_embedding(self, text: str) -> list[float]:
         """Generate embedding for text using OpenAI API"""
         async with self.sem:
             try:
@@ -268,30 +271,25 @@ class PineScriptDocsCrawler:
                     text = text[:max_length]
 
                 response = await self.openai.embeddings.create(
-                    input=text,
-                    model="text-embedding-3-small"
+                    input=text, model="text-embedding-3-small"
                 )
                 return response.data[0].embedding
             except Exception as e:
                 logger.error("Error generating embedding: %s", e)
                 return []
 
-    async def crawl_docs(self, urls: List[str]):
+    async def crawl_docs(self, urls: list[str]):
         """Crawl documentation pages and store in vector database"""
         logger.info("Starting crawling process...")
 
         # Configure extraction strategy
-        structure_strategy = JsonCssExtractionStrategy(
-            schema=self.structure_schema,
-            verbose=True
-        )
+        structure_strategy = JsonCssExtractionStrategy(schema=self.structure_schema, verbose=True)
 
         browser_config = BrowserConfig(
-            headless=True,
-            extra_args=["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"]
+            headless=True, extra_args=["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"]
         )
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         combined_path = f"{self.output_dir}/all_docs_{timestamp}.md"
         failed_path = f"{self.output_dir}/failed_urls_{timestamp}.txt"
 
@@ -306,13 +304,14 @@ class PineScriptDocsCrawler:
                 success = 0
                 failed = 0
 
-                with open(combined_path, "w", encoding="utf-8") as combined_file, \
-                     open(failed_path, "w", encoding="utf-8") as failed_file:
-
+                with (
+                    open(combined_path, "w", encoding="utf-8") as combined_file,
+                    open(failed_path, "w", encoding="utf-8") as failed_file,
+                ):
                     # Process in small batches
                     batch_size = 3
                     for i in range(0, len(urls), batch_size):
-                        batch = urls[i:i + batch_size]
+                        batch = urls[i : i + batch_size]
                         total_batches = (len(urls) + batch_size - 1) // batch_size
                         logger.info("Processing batch %d/%d", i // batch_size + 1, total_batches)
 
@@ -327,20 +326,21 @@ class PineScriptDocsCrawler:
 
                                 # Use the extraction strategy
                                 result = await crawler.arun(
-                                    url=url,
-                                    extraction_strategy=structure_strategy
+                                    url=url, extraction_strategy=structure_strategy
                                 )
 
                                 if result.success:
                                     # Get page name for file
-                                    page_name = url.rstrip('/').split('/')[-1] or 'index'
+                                    page_name = url.rstrip("/").split("/")[-1] or "index"
                                     file_path = f"{self.output_dir}/{page_name}_{timestamp}.md"
 
-                                    # Get the markdown content - handle both string and MarkdownGenerationResult object
+                                    # Handle both str and MarkdownGenerationResult
                                     if isinstance(result.markdown, str):
                                         markdown = result.markdown
                                     else:
-                                        markdown = result.markdown.raw_markdown if result.markdown else ""
+                                        markdown = (
+                                            result.markdown.raw_markdown if result.markdown else ""
+                                        )
 
                                     # Save individual file
                                     with open(file_path, "w", encoding="utf-8") as f:
@@ -360,13 +360,15 @@ class PineScriptDocsCrawler:
                                     success += 1
                                     logger.info("Successfully processed: %s", page_name)
                                 else:
-                                    logger.warning("Failed to crawl %s: %s", url, result.error_message)
+                                    logger.warning(
+                                        "Failed to crawl %s: %s", url, result.error_message
+                                    )
                                     failed_file.write(f"{url}: {result.error_message}\n")
                                     failed += 1
 
                             except Exception as e:
                                 logger.error("Error processing %s: %s", url, e)
-                                failed_file.write(f"{url}: {str(e)}\n")
+                                failed_file.write(f"{url}: {e!s}\n")
                                 failed += 1
 
                         # Rate limiting between batches
@@ -376,7 +378,9 @@ class PineScriptDocsCrawler:
                 count = await pool.fetchval("SELECT COUNT(*) FROM pinescript_docs")
                 logger.info(
                     "Crawling completed — processed: %d, failed: %d, db sections: %d",
-                    success, failed, count,
+                    success,
+                    failed,
+                    count,
                 )
 
     async def process_and_store_document(self, url: str, markdown: str, pool: asyncpg.Pool):
@@ -401,12 +405,11 @@ class PineScriptDocsCrawler:
         for section in sections:
             # Check if already exists
             exists = await pool.fetchval(
-                "SELECT 1 FROM pinescript_docs WHERE url = $1",
-                section["url"]
+                "SELECT 1 FROM pinescript_docs WHERE url = $1", section["url"]
             )
 
             if exists:
-                logger.debug("Section already exists: %s", section['url'])
+                logger.debug("Section already exists: %s", section["url"])
                 continue
 
             # Generate embedding
@@ -414,7 +417,7 @@ class PineScriptDocsCrawler:
             embedding = await self.generate_embedding(embedding_text)
 
             if not embedding:
-                logger.warning("Failed to generate embedding for %s", section['url'])
+                logger.warning("Failed to generate embedding for %s", section["url"])
                 continue
 
             # Convert to JSON
@@ -433,9 +436,9 @@ class PineScriptDocsCrawler:
                 embedding_json,
             )
 
-            logger.debug("Inserted section: %s", section['title'])
+            logger.debug("Inserted section: %s", section["title"])
 
-    def split_into_sections(self, markdown: str, url: str) -> List[Dict[str, str]]:
+    def split_into_sections(self, markdown: str, url: str) -> list[dict[str, str]]:
         """Split markdown into chunks using recursive character splitting with overlap.
 
         Uses heading structure to identify sections, then applies recursive
@@ -452,20 +455,22 @@ class PineScriptDocsCrawler:
             lines = lines[1:]
 
         # First pass: identify heading-based sections
-        raw_sections: List[Dict[str, str]] = []
+        raw_sections: list[dict[str, str]] = []
         current_section = None
-        current_content: List[str] = []
+        current_content: list[str] = []
 
         for line in lines:
-            if line.startswith("## ") or line.startswith("### "):
+            if line.startswith(("## ", "### ")):
                 # Save previous section
                 if current_section and current_content:
                     content = "\n".join(current_content).strip()
                     if content:
-                        raw_sections.append({
-                            "title": current_section,
-                            "content": content,
-                        })
+                        raw_sections.append(
+                            {
+                                "title": current_section,
+                                "content": content,
+                            }
+                        )
                 # Start new section
                 heading = line.lstrip("#").strip()
                 current_section = heading
@@ -480,28 +485,34 @@ class PineScriptDocsCrawler:
         if current_section and current_content:
             content = "\n".join(current_content).strip()
             if content:
-                raw_sections.append({
-                    "title": current_section,
-                    "content": content,
-                })
+                raw_sections.append(
+                    {
+                        "title": current_section,
+                        "content": content,
+                    }
+                )
 
         # Handle pre-heading content
         if not current_section and current_content:
             content = "\n".join(current_content).strip()
             if content:
-                raw_sections.append({
-                    "title": page_title,
-                    "content": content,
-                })
+                raw_sections.append(
+                    {
+                        "title": page_title,
+                        "content": content,
+                    }
+                )
 
         # If no sections found at all, treat entire doc as one section
         if not raw_sections and lines:
             content = "\n".join(lines).strip()
             if content:
-                raw_sections.append({
-                    "title": page_title,
-                    "content": content,
-                })
+                raw_sections.append(
+                    {
+                        "title": page_title,
+                        "content": content,
+                    }
+                )
 
         # Second pass: recursive character split within each section
         chunk_idx = 0
@@ -520,12 +531,14 @@ class PineScriptDocsCrawler:
                 # Prepend contextual chunk header
                 enriched = prepend_chunk_header(page_title, section_title, chunk)
 
-                section_id = re.sub(r'[^a-z0-9]+', '-', section_title.lower())
-                sections.append({
-                    "url": f"{url}#{section_id}-{chunk_idx}",
-                    "title": f"{page_title} - {section_title}",
-                    "content": enriched,
-                })
+                section_id = re.sub(r"[^a-z0-9]+", "-", section_title.lower())
+                sections.append(
+                    {
+                        "url": f"{url}#{section_id}-{chunk_idx}",
+                        "title": f"{page_title} - {section_title}",
+                        "content": enriched,
+                    }
+                )
                 chunk_idx += 1
 
         return sections
@@ -558,7 +571,8 @@ async def clear_database():
         count_after = await pool.fetchval("SELECT COUNT(*) FROM pinescript_docs")
         logger.info(
             "Deleted %d records — database now contains %d",
-            count_before - count_after, count_after,
+            count_before - count_after,
+            count_after,
         )
 
 

@@ -19,14 +19,13 @@ from rag_utils import (
     RetrievedDoc,
     _cosine_sim,
     apply_similarity_threshold,
+    hybrid_retrieve,
     mmr_select,
     prepend_chunk_header,
     reciprocal_rank_fusion,
     recursive_character_split,
     rerank_docs,
-    hybrid_retrieve,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -59,7 +58,7 @@ def _doc(
 class TestContextualChunkHeaders:
     def test_prepends_header_with_different_section(self):
         result = prepend_chunk_header("Arrays", "Sorting", "Use array.sort().")
-        assert result.startswith("Document: PineScript v5 Reference | Section: Arrays > Sorting")
+        assert result.startswith("Document: PineScript v6 Reference | Section: Arrays > Sorting")
         assert "Use array.sort()." in result
 
     def test_prepends_header_same_section_as_page(self):
@@ -74,7 +73,7 @@ class TestContextualChunkHeaders:
 
     def test_empty_content(self):
         result = prepend_chunk_header("Page", "Section", "")
-        assert "Document: PineScript v5 Reference" in result
+        assert "Document: PineScript v6 Reference" in result
 
 
 # ---------------------------------------------------------------------------
@@ -412,13 +411,16 @@ class TestCrawlerChunking:
     def test_split_produces_chunks_with_headers(self):
         crawler = self._get_crawler()
 
-        markdown = "# Arrays\n\n## Sorting\n\nUse array.sort() to sort arrays.\n\n## Inserting\n\nUse array.push()."
+        markdown = (
+            "# Arrays\n\n## Sorting\n\nUse array.sort() to sort arrays.\n\n"
+            "## Inserting\n\nUse array.push()."
+        )
         sections = crawler.split_into_sections(markdown, "https://docs.tv/arrays")
 
         assert len(sections) >= 2
         # Each section should have contextual header
         for sec in sections:
-            assert "Document: PineScript v5 Reference" in sec["content"]
+            assert "Document: PineScript v6 Reference" in sec["content"]
             assert "Section:" in sec["content"]
 
     def test_split_long_section_into_multiple_chunks(self):

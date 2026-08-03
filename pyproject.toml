@@ -42,5 +42,20 @@ Repository = "https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert"
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "PIE", # flake8-pie
+    "DTZ", # flake8-datetimez
+    "RUF", # ruff-specific
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

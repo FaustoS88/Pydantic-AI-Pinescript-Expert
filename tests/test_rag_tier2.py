@@ -9,17 +9,17 @@ Covers:
 
 from __future__ import annotations
 
-import sys
 import os
-import pytest
+import sys
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 # Make project root importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from db_schema import DB_MIGRATION, DB_SCHEMA
 from rag_utils import code_aware_split, detect_content_type, generate_contextual_prefix
-from db_schema import DB_SCHEMA, DB_MIGRATION
-
 
 # ===========================================================================
 # TestCodeAwareSplit
@@ -86,15 +86,11 @@ class TestCodeAwareSplit:
         for chunk in result:
             backtick_count = chunk.count("```")
             # Even count means balanced fences (or zero)
-            assert backtick_count % 2 == 0, (
-                f"Unbalanced backticks in chunk: {chunk!r}"
-            )
+            assert backtick_count % 2 == 0, f"Unbalanced backticks in chunk: {chunk!r}"
 
     def test_inline_code_not_protected(self):
         """Single-backtick inline code is NOT treated as a fenced block."""
-        long_text = (
-            "The `ta.ema()` function computes the exponential moving average. " * 30
-        )
+        long_text = "The `ta.ema()` function computes the exponential moving average. " * 30
         result = code_aware_split(long_text, chunk_size=200, chunk_overlap=0)
         # Should split into multiple chunks (inline code does not block splitting)
         assert len(result) > 1
@@ -106,9 +102,7 @@ class TestCodeAwareSplit:
         result = code_aware_split(text, chunk_size=80, chunk_overlap=0)
         for chunk in result:
             backtick_count = chunk.count("```")
-            assert backtick_count % 2 == 0, (
-                f"Unbalanced backticks in chunk: {chunk!r}"
-            )
+            assert backtick_count % 2 == 0, f"Unbalanced backticks in chunk: {chunk!r}"
         # Each code block must appear in its entirety somewhere
         for i in range(5):
             assert any(f"block_{i} = {i}" in c for c in result)
@@ -175,7 +169,9 @@ class TestGenerateContextualPrefix:
         # We check the LLM was called exactly once (no crash).
         client.chat.completions.create.assert_awaited_once()
         call_kwargs = client.chat.completions.create.call_args
-        prompt_text = call_kwargs.kwargs.get("messages", call_kwargs.args[0] if call_kwargs.args else [])
+        prompt_text = call_kwargs.kwargs.get(
+            "messages", call_kwargs.args[0] if call_kwargs.args else []
+        )
         # Extract prompt content from messages list
         if isinstance(prompt_text, list):
             full_prompt = " ".join(m.get("content", "") for m in prompt_text)

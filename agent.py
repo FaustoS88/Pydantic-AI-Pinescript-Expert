@@ -16,32 +16,32 @@ import asyncio
 import logging
 import os
 import sys
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncGenerator
 
 import asyncpg
+from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.capabilities import Capability, Thinking
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
-from dotenv import load_dotenv
 
 from config import (
+    DEFAULT_DATABASE_URL,
     DEFAULT_MODEL,
     EMBEDDING_MODEL,
+    HYBRID_SEARCH_ALPHA,
     LLM_MAX_TOKENS,
     LLM_TEMPERATURE,
+    MMR_LAMBDA,
     OPENROUTER_BASE_URL,
     OPENROUTER_DEFAULT_MODEL,
-    DEFAULT_DATABASE_URL,
-    HYBRID_SEARCH_ALPHA,
-    SIMILARITY_THRESHOLD,
-    RETRIEVAL_CANDIDATES,
     RERANK_TOP_N,
-    MMR_LAMBDA,
+    RETRIEVAL_CANDIDATES,
+    SIMILARITY_THRESHOLD,
     THINKING_EFFORT,
 )
 from rag_utils import hybrid_retrieve
@@ -59,15 +59,12 @@ logger = logging.getLogger(__name__)
 # API key helper (unchanged from v1)
 # ---------------------------------------------------------------------------
 
+
 def get_openai_api_key() -> str:
     """Get OpenAI API key with validation and interactive prompt if needed."""
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
-    if (
-        not openai_api_key
-        or "YOUR_" in openai_api_key
-        or openai_api_key == "sk-..."
-    ):
+    if not openai_api_key or "YOUR_" in openai_api_key or openai_api_key == "sk-...":
         logger.warning("OPENAI_API_KEY is not set or has a placeholder value.")
         print("Please enter your OpenAI API key:")
         openai_api_key = input("> ")
@@ -78,6 +75,7 @@ def get_openai_api_key() -> str:
         env_path = os.path.join(os.path.dirname(__file__), ".env")
         try:
             from dotenv import set_key
+
             set_key(env_path, "OPENAI_API_KEY", openai_api_key)
             logger.info("Updated OPENAI_API_KEY in %s", env_path)
         except ImportError:
@@ -90,6 +88,7 @@ def get_openai_api_key() -> str:
 # Output schema (unchanged)
 # ---------------------------------------------------------------------------
 
+
 class PineScriptResult(BaseModel):
     query: str = Field(description="The original query")
     response: str = Field(description="The generated response")
@@ -101,9 +100,11 @@ class PineScriptResult(BaseModel):
 # fields that were never read by any tool.
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Dependencies:
     """Runtime dependencies injected per run."""
+
     openai: AsyncOpenAI
     pool: asyncpg.Pool
 
@@ -180,12 +181,11 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
         logger.debug("Hybrid retrieval returned %d documents", len(docs))
 
         return "\n\n".join(
-            f"# {doc.title}\nDocumentation URL: {doc.url}\n\n{doc.content}\n"
-            for doc in docs
+            f"# {doc.title}\nDocumentation URL: {doc.url}\n\n{doc.content}\n" for doc in docs
         )
     except Exception as e:
         logger.error("Error in retrieve tool: %s", e)
-        return f"Error retrieving documentation: {str(e)}"
+        return f"Error retrieving documentation: {e!s}"
 
 
 # ---------------------------------------------------------------------------
@@ -199,16 +199,16 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
 # ---------------------------------------------------------------------------
 
 pinescript_agent = Agent(
-    DEFAULT_MODEL,                        # "openai:gpt-4o-mini"
+    DEFAULT_MODEL,  # "openai:gpt-4o-mini"
     deps_type=Dependencies,
-    output_type=PineScriptResult,         # v2 naming (was result_type in old v1)
+    output_type=PineScriptResult,  # v2 naming (was result_type in old v1)
     capabilities=[
-        Thinking(effort=THINKING_EFFORT), # extended reasoning, unified across providers
-        pinescript_rag,                   # retrieve tool + expert instructions
+        Thinking(effort=THINKING_EFFORT),  # extended reasoning, unified across providers
+        pinescript_rag,  # retrieve tool + expert instructions
     ],
     model_settings={
-        "temperature": LLM_TEMPERATURE,   # 0.2 — now actually applied every run
-        "max_tokens": LLM_MAX_TOKENS,     # 2000
+        "temperature": LLM_TEMPERATURE,  # 0.2 — now actually applied every run
+        "max_tokens": LLM_MAX_TOKENS,  # 2000
     },
 )
 
@@ -216,6 +216,7 @@ pinescript_agent = Agent(
 # ---------------------------------------------------------------------------
 # Database helper (unchanged)
 # ---------------------------------------------------------------------------
+
 
 @asynccontextmanager
 async def database_connect(create_db: bool = False) -> AsyncGenerator[asyncpg.Pool, None]:
@@ -242,6 +243,7 @@ async def database_connect(create_db: bool = False) -> AsyncGenerator[asyncpg.Po
 # v2: resolve_model() → agent.run(model=...)  (no context manager needed)
 # ---------------------------------------------------------------------------
 
+
 def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
     """Resolve a preset name or raw model ID to a Pydantic AI model.
 
@@ -261,9 +263,7 @@ def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
             logger.info("Using raw model ID: %s", model_id)
 
         if openrouter_api_key:
-            provider = OpenAIProvider(
-                base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key
-            )
+            provider = OpenAIProvider(base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key)
             return OpenAIChatModel(model_id, provider=provider)
 
         logger.warning("No OPENROUTER_API_KEY for preset '%s', using default", preset)
@@ -271,9 +271,7 @@ def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
 
     # No preset: use OpenRouter default if key exists, else agent default
     if openrouter_api_key:
-        provider = OpenAIProvider(
-            base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key
-        )
+        provider = OpenAIProvider(base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key)
         return OpenAIChatModel(OPENROUTER_DEFAULT_MODEL, provider=provider)
 
     return None  # agent default (OpenAI)
@@ -282,6 +280,7 @@ def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
 # ---------------------------------------------------------------------------
 # Run helper — now accepts message_history for proper multi-turn
 # ---------------------------------------------------------------------------
+
 
 async def run_agent(question: str, preset: str | None = None, message_history=None):
     """Run the agent with a specific question.
@@ -322,6 +321,7 @@ async def run_agent(question: str, preset: str | None = None, message_history=No
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+
 async def main():
     """Run the agent from the command line."""
     if len(sys.argv) > 1:
@@ -334,7 +334,7 @@ async def main():
 
     if result:
         print("\nResponse:")
-        print(result.output.response)           # v2: .output (was .data)
+        print(result.output.response)  # v2: .output (was .data)
         print(f"\nSnippets used: {result.output.snippets_used}")
     else:
         print("No response received from the agent.")
