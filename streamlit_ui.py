@@ -5,22 +5,23 @@ Key fix over v1: message history now includes BOTH user and assistant
 messages, so the model sees its own prior answers in multi-turn chats.
 """
 
-import streamlit as st
 import asyncio
 import os
-import sys
 import pickle
+import sys
 from pathlib import Path
+
+import streamlit as st
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 # v2 message types for proper history reconstruction
-from pydantic_ai.messages import ModelRequest, ModelResponse, UserPromptPart, TextPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
 
-from agent import database_connect, Dependencies, pinescript_agent  # noqa: E402
+from agent import Dependencies, database_connect, pinescript_agent  # noqa: E402
 from db_schema import validate_schema  # noqa: E402
 
 load_dotenv(override=True)
@@ -31,6 +32,7 @@ HISTORY_FILE = os.path.join(current_dir, "chat_history.pkl")
 # ---------------------------------------------------------------------------
 # Chat history persistence (pickle — swap for Harness Memory later)
 # ---------------------------------------------------------------------------
+
 
 def load_chat_history() -> list[dict]:
     if os.path.exists(HISTORY_FILE):
@@ -60,18 +62,15 @@ def save_chat_history(messages: list[dict]) -> None:
 #               ModelResponse for assistant turns
 # ---------------------------------------------------------------------------
 
+
 def build_message_history(messages: list[dict]) -> list:
     """Convert Streamlit chat dicts to Pydantic AI model messages."""
     model_messages = []
     for msg in messages:
         if msg["role"] == "user":
-            model_messages.append(
-                ModelRequest(parts=[UserPromptPart(content=msg["content"])])
-            )
+            model_messages.append(ModelRequest(parts=[UserPromptPart(content=msg["content"])]))
         elif msg["role"] == "assistant":
-            model_messages.append(
-                ModelResponse(parts=[TextPart(content=msg["content"])])
-            )
+            model_messages.append(ModelResponse(parts=[TextPart(content=msg["content"])]))
     return model_messages
 
 
@@ -98,6 +97,7 @@ if "messages" not in st.session_state:
 # Setup verification
 # ---------------------------------------------------------------------------
 
+
 async def verify_setup():
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key or openai_api_key in ("YOUR_OPENAI_API_KEY", "sk-...", ""):
@@ -119,6 +119,7 @@ async def verify_setup():
 # ---------------------------------------------------------------------------
 # Query processing — v2: passes full history (user + assistant) to the model
 # ---------------------------------------------------------------------------
+
 
 async def process_query(prompt: str, history: list[dict]):
     openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))

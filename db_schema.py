@@ -61,13 +61,14 @@ ALTER TABLE pinescript_docs ADD COLUMN IF NOT EXISTS content_type      TEXT    D
 ALTER TABLE pinescript_docs ADD COLUMN IF NOT EXISTS contextual_prefix TEXT;
 """
 
+
 # Function to validate the schema (can be called to ensure DB is ready)
 async def validate_schema(pool):
     """Validate that the database schema is correctly set up.
-    
+
     Args:
         pool: Database connection pool
-        
+
     Returns:
         bool: Whether the schema is valid
     """
@@ -79,7 +80,7 @@ async def validate_schema(pool):
         if not extension_exists:
             print("Error: pgvector extension is not installed")
             return False
-            
+
         # Check if the pinescript_docs table exists
         table_exists = await pool.fetchval(
             "SELECT 1 FROM information_schema.tables WHERE table_name = 'pinescript_docs'"
@@ -87,7 +88,7 @@ async def validate_schema(pool):
         if not table_exists:
             print("Error: pinescript_docs table does not exist")
             return False
-            
+
         # Check if the embedding index exists
         index_exists = await pool.fetchval(
             "SELECT 1 FROM pg_indexes WHERE indexname = 'idx_pinescript_docs_embedding'"
@@ -95,11 +96,12 @@ async def validate_schema(pool):
         if not index_exists:
             print("Warning: idx_pinescript_docs_embedding index does not exist")
             # Not returning False here as missing index is not critical
-            
+
         return True
     except Exception as e:
         print(f"Error validating schema: {e}")
         return False
+
 
 # Function to create the schema
 async def create_schema(pool):
@@ -112,9 +114,8 @@ async def create_schema(pool):
         bool: Whether the schema was created successfully
     """
     try:
-        async with pool.acquire() as conn:
-            async with conn.transaction():
-                await conn.execute(DB_SCHEMA)
+        async with pool.acquire() as conn, conn.transaction():
+            await conn.execute(DB_SCHEMA)
         print("Database schema created successfully")
         return True
     except Exception as e:
@@ -134,9 +135,8 @@ async def run_migration(pool):
         bool: Whether the migration ran successfully
     """
     try:
-        async with pool.acquire() as conn:
-            async with conn.transaction():
-                await conn.execute(DB_MIGRATION)
+        async with pool.acquire() as conn, conn.transaction():
+            await conn.execute(DB_MIGRATION)
         print("Migration completed successfully")
         return True
     except Exception as e:

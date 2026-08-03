@@ -1,7 +1,8 @@
 """RAGAS evaluation harness for the PineScript Expert RAG pipeline.
 
 Usage:
-    python tests/ragas_eval.py [--output results/baseline_YYYYMMDD.json] [--retrieval baseline|tier1]
+    python tests/ragas_eval.py [--output results/baseline_YYYYMMDD.json]
+                              [--retrieval baseline|tier1]
 
     --retrieval baseline  L2 vector search, no threshold, no reranking (default)
     --retrieval tier1     Hybrid cosine+BM25, RRF, similarity threshold, cross-encoder rerank, MMR
@@ -22,7 +23,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -51,12 +52,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from config import (  # noqa: E402
     DEFAULT_DATABASE_URL,
     EMBEDDING_MODEL,
-    VECTOR_SEARCH_LIMIT,
     HYBRID_SEARCH_ALPHA,
-    SIMILARITY_THRESHOLD,
-    RETRIEVAL_CANDIDATES,
-    RERANK_TOP_N,
     MMR_LAMBDA,
+    RERANK_TOP_N,
+    RETRIEVAL_CANDIDATES,
+    SIMILARITY_THRESHOLD,
+    VECTOR_SEARCH_LIMIT,
 )
 from rag_utils import hybrid_retrieve  # noqa: E402
 
@@ -79,6 +80,7 @@ SYSTEM_PROMPT = (
 # Retrieval — baseline (L2) or tier1 (hybrid cosine+BM25, rerank, MMR)
 # ---------------------------------------------------------------------------
 
+
 async def retrieve_contexts_baseline(
     question: str,
     openai_client: AsyncOpenAI,
@@ -94,16 +96,12 @@ async def retrieve_contexts_baseline(
     embedding_json = pydantic_core.to_json(embedding_vector).decode()
 
     rows = await pool.fetch(
-        f"SELECT url, title, content FROM pinescript_docs "
-        f"ORDER BY embedding <-> $1 LIMIT {limit}",
+        f"SELECT url, title, content FROM pinescript_docs ORDER BY embedding <-> $1 LIMIT {limit}",
         embedding_json,
     )
     if not rows:
         return []
-    return [
-        f"# {row['title']}\nURL: {row['url']}\n\n{row['content']}"
-        for row in rows
-    ]
+    return [f"# {row['title']}\nURL: {row['url']}\n\n{row['content']}" for row in rows]
 
 
 async def retrieve_contexts_tier1(
@@ -131,15 +129,13 @@ async def retrieve_contexts_tier1(
     )
     if not docs:
         return []
-    return [
-        f"# {doc.title}\nURL: {doc.url}\n\n{doc.content}"
-        for doc in docs
-    ]
+    return [f"# {doc.title}\nURL: {doc.url}\n\n{doc.content}" for doc in docs]
 
 
 # ---------------------------------------------------------------------------
 # Generation — direct OpenRouter call (bypasses pydantic-ai version issues)
 # ---------------------------------------------------------------------------
+
 
 async def generate_answer(
     question: str,
@@ -153,10 +149,7 @@ async def generate_answer(
 
     context_block = "\n\n---\n\n".join(contexts) if contexts else "(no context retrieved)"
 
-    user_msg = (
-        f"## Retrieved Documentation\n\n{context_block}\n\n"
-        f"---\n\n## Question\n\n{question}"
-    )
+    user_msg = f"## Retrieved Documentation\n\n{context_block}\n\n---\n\n## Question\n\n{question}"
 
     try:
         resp = await http_client.post(
@@ -179,7 +172,7 @@ async def generate_answer(
         resp.raise_for_status()
         data = resp.json()
         return data["choices"][0]["message"]["content"]
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("Generation error for question %r: %s", question[:60], exc)
         return f"[ERROR] {exc}"
 
@@ -187,6 +180,7 @@ async def generate_answer(
 # ---------------------------------------------------------------------------
 # RAGAS evaluation (v0.4 API)
 # ---------------------------------------------------------------------------
+
 
 def run_ragas(
     questions: list[str],
@@ -202,13 +196,13 @@ def run_ragas(
     Both are old-style metrics compatible with evaluate().
     """
     try:
-        from ragas import evaluate, RunConfig
-        from ragas.dataset_schema import SingleTurnSample, EvaluationDataset
-        from ragas.metrics._faithfulness import Faithfulness
-        from ragas.metrics._nv_metrics import ContextRelevance
-        from ragas.llms import llm_factory, LangchainLLMWrapper
         from langchain_openai import ChatOpenAI
         from openai import OpenAI
+        from ragas import RunConfig, evaluate
+        from ragas.dataset_schema import EvaluationDataset, SingleTurnSample
+        from ragas.llms import LangchainLLMWrapper, llm_factory
+        from ragas.metrics._faithfulness import Faithfulness
+        from ragas.metrics._nv_metrics import ContextRelevance
     except ImportError as exc:
         logger.error(
             "RAGAS dependencies missing. Run: pip install ragas datasets langchain-openai\n%s",
@@ -224,9 +218,7 @@ def run_ragas(
     instructor_llm.model_args["max_tokens"] = 8192
 
     # LangchainLLMWrapper for ContextRelevance (uses agenerate_text interface)
-    langchain_llm = LangchainLLMWrapper(
-        ChatOpenAI(model="gpt-4.1-mini", api_key=openai_api_key)
-    )
+    langchain_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4.1-mini", api_key=openai_api_key))
 
     metrics = [
         Faithfulness(llm=instructor_llm),
@@ -235,24 +227,28 @@ def run_ragas(
 
     # Build evaluation dataset
     samples = []
-    for q, a, ctx in zip(questions, answers, contexts):
-        samples.append(SingleTurnSample(
-            user_input=q,
-            response=a,
-            retrieved_contexts=ctx,
-        ))
+    for q, a, ctx in zip(questions, answers, contexts, strict=True):
+        samples.append(
+            SingleTurnSample(
+                user_input=q,
+                response=a,
+                retrieved_contexts=ctx,
+            )
+        )
     dataset = EvaluationDataset(samples=samples)
 
     run_config = RunConfig(max_retries=2, max_wait=120, max_workers=4)
 
-    logger.info("Running RAGAS evaluate() on %d samples (2 metrics x %d) …", len(questions), len(questions))
+    logger.info(
+        "Running RAGAS evaluate() on %d samples (2 metrics x %d) …", len(questions), len(questions)
+    )
     result = evaluate(dataset=dataset, metrics=metrics, run_config=run_config)
 
     # Convert to plain dict
     try:
         scores_df = result.to_pandas()
         return scores_df.to_dict(orient="list")
-    except Exception:  # noqa: BLE001
+    except Exception:
         return dict(result)
 
 
@@ -348,7 +344,7 @@ def print_report(report: dict[str, Any], meta: dict[str, Any]) -> None:
             f_ = it.get("faithfulness")
             cp_s = f"{cp:.2f}" if cp is not None else "n/a"
             f_s = f"{f_:.2f}" if f_ is not None else "n/a"
-            print(f"  Q: \"{it['question'][:70]}\" → CP={cp_s}, F={f_s}")
+            print(f'  Q: "{it["question"][:70]}" → CP={cp_s}, F={f_s}')
 
     print(sep)
 
@@ -397,7 +393,9 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
     contexts: list[list[str]] = []
     items: list[dict[str, Any]] = []
 
-    retrieve_fn = retrieve_contexts_tier1 if retrieval_mode == "tier1" else retrieve_contexts_baseline
+    retrieve_fn = (
+        retrieve_contexts_tier1 if retrieval_mode == "tier1" else retrieve_contexts_baseline
+    )
 
     # Partial save: written after every question so we never lose progress on crash
     RESULTS_DIR.mkdir(exist_ok=True)
@@ -411,7 +409,7 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
                 "contexts": c,
                 "item": item,
             }
-            for q, a, c, item in zip(questions, answers, contexts, items)
+            for q, a, c, item in zip(questions, answers, contexts, items, strict=True)
         ]
         with open(partial_path, "w") as fh:
             json.dump(partial_data, fh, indent=2, default=str)
@@ -449,7 +447,7 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
     # RAGAS evaluation
     ragas_scores = run_ragas(questions, answers, contexts)
 
-    run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    run_date = datetime.now(UTC).strftime("%Y-%m-%d")
     meta = {
         "date": run_date,
         "questions": len(testset),
@@ -480,7 +478,9 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run RAGAS evaluation on the PineScript Expert RAG pipeline.")
+    parser = argparse.ArgumentParser(
+        description="Run RAGAS evaluation on the PineScript Expert RAG pipeline."
+    )
     parser.add_argument(
         "--retrieval",
         choices=["baseline", "tier1"],
@@ -497,7 +497,7 @@ def main() -> None:
 
     if args.output is None:
         tag = args.retrieval
-        args.output = RESULTS_DIR / f"{tag}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+        args.output = RESULTS_DIR / f"{tag}_{datetime.now(UTC).strftime('%Y%m%d')}.json"
 
     asyncio.run(run_evaluation(args.output, retrieval_mode=args.retrieval))
 

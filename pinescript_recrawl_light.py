@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import sys
+
 import asyncpg
 import html2text
 import httpx
@@ -30,21 +31,21 @@ from openai import AsyncOpenAI
 load_dotenv(override=True)
 
 # Import from existing project modules
-from db_schema import create_schema, run_migration  # noqa: E402
 from agent import database_connect  # noqa: E402
+from config import (  # noqa: E402
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    CONTEXTUAL_MODEL,
+    EMBEDDING_MODEL,
+    MAX_PAGE_CONTEXT_CHARS,
+    OPENROUTER_BASE_URL,
+)
+from db_schema import create_schema, run_migration  # noqa: E402
 from rag_utils import (  # noqa: E402
     code_aware_split,
     detect_content_type,
     generate_contextual_prefix,
     prepend_chunk_header,
-)
-from config import (  # noqa: E402
-    CHUNK_SIZE,
-    CHUNK_OVERLAP,
-    CONTEXTUAL_MODEL,
-    EMBEDDING_MODEL,
-    MAX_PAGE_CONTEXT_CHARS,
-    OPENROUTER_BASE_URL,
 )
 
 # --contextual flag: generate LLM context prefix per chunk (opt-in, costs ~$5-10)
@@ -124,9 +125,7 @@ async def fetch_page_markdown(client: httpx.AsyncClient, url: str) -> tuple[str,
     return title, markdown
 
 
-def split_into_sections(
-    markdown: str, url: str, page_title: str
-) -> list[dict]:
+def split_into_sections(markdown: str, url: str, page_title: str) -> list[dict]:
     """Split markdown into chunks with headers, using code-aware chunking.
 
     Returns dicts with keys: url, title, content, chunk_index, content_type.
@@ -146,7 +145,7 @@ def split_into_sections(
     current_content: list[str] = []
 
     for line in lines:
-        if line.startswith("## ") or line.startswith("### "):
+        if line.startswith(("## ", "### ")):
             if current_section and current_content:
                 content = "\n".join(current_content).strip()
                 if content:
@@ -211,9 +210,7 @@ async def generate_embedding(
     """Generate embedding with concurrency limit."""
     async with sem:
         try:
-            resp = await openai_client.embeddings.create(
-                input=text, model=EMBEDDING_MODEL
-            )
+            resp = await openai_client.embeddings.create(input=text, model=EMBEDDING_MODEL)
             return resp.data[0].embedding
         except Exception as exc:
             logger.warning("Embedding error: %s", exc)
@@ -257,7 +254,7 @@ async def process_and_store(
                     contextual_prefix = prefix
                     # Enriched content used for embedding: context marker + chunk
                     embed_content = f"[Context: {prefix}]\n\n{raw_chunk}"
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.warning("Contextual prefix failed for %s: %s", url, exc)
                     # Fall back to header-enriched content
                     embed_content = section["content"]
@@ -360,7 +357,12 @@ async def run_recrawl() -> None:
                         continue
 
                     chunks = await process_and_store(
-                        pool, openai_client, sem, url, title, markdown,
+                        pool,
+                        openai_client,
+                        sem,
+                        url,
+                        title,
+                        markdown,
                         contextual_client=contextual_client,
                     )
                     total_chunks += chunks

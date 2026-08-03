@@ -10,9 +10,10 @@ This script:
 Run this script before running the crawler or using the agent.
 """
 
+import asyncio
 import logging
 import os
-import asyncio
+
 import asyncpg
 from dotenv import load_dotenv
 
@@ -22,6 +23,7 @@ from db_schema import DB_SCHEMA
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
 
 async def init_database():
     """Initialize the database"""
@@ -46,20 +48,16 @@ async def init_database():
         )
         logger.info("Tables in database:")
         for table in tables:
-            logger.info("  - %s", table['table_name'])
+            logger.info("  - %s", table["table_name"])
 
         # Verify vector extension
-        extensions = await conn.fetch(
-            "SELECT extname FROM pg_extension"
-        )
+        extensions = await conn.fetch("SELECT extname FROM pg_extension")
         logger.info("Extensions in database:")
         for ext in extensions:
-            logger.info("  - %s", ext['extname'])
+            logger.info("  - %s", ext["extname"])
 
         # Check if vector extension is installed
-        vector_ext = await conn.fetchval(
-            "SELECT 1 FROM pg_extension WHERE extname = 'vector'"
-        )
+        vector_ext = await conn.fetchval("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
         if vector_ext:
             logger.info("Vector extension is installed")
         else:
@@ -71,14 +69,16 @@ async def init_database():
     except Exception as e:
         logger.error("Error initializing database: %s", e)
     finally:
-        if 'conn' in locals():
+        if "conn" in locals():
             await conn.close()
             logger.info("Database connection closed")
+
 
 def main():
     """Main entry point"""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     asyncio.run(init_database())
+
 
 if __name__ == "__main__":
     main()

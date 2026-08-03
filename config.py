@@ -41,9 +41,7 @@ RETRIEVAL_CANDIDATES = int(os.getenv("PINESCRIPT_RETRIEVAL_CANDIDATES", "15"))
 RERANK_TOP_N = int(os.getenv("PINESCRIPT_RERANK_TOP_N", "15"))
 
 # Cross-encoder model for reranking
-RERANK_MODEL = os.getenv(
-    "PINESCRIPT_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-)
+RERANK_MODEL = os.getenv("PINESCRIPT_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 # MMR diversity parameter (1.0 = pure relevance, 0.0 = pure diversity)
 MMR_LAMBDA = float(os.getenv("PINESCRIPT_MMR_LAMBDA", "0.7"))
@@ -71,12 +69,8 @@ MAX_PAGE_CONTEXT_CHARS: int = int(os.getenv("PINESCRIPT_MAX_PAGE_CONTEXT_CHARS",
 # OpenRouter settings
 # ---------------------------------------------------------------------------
 
-OPENROUTER_BASE_URL = os.getenv(
-    "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
-)
-OPENROUTER_DEFAULT_MODEL = os.getenv(
-    "OPENROUTER_MODEL", "openai/gpt-4.1-mini"
-)
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+OPENROUTER_DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
 
 # ---------------------------------------------------------------------------
 # Database

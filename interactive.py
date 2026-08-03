@@ -8,9 +8,10 @@ its own prior answers when you ask follow-up questions.
 
 import asyncio
 import sys
+
 from dotenv import load_dotenv
 
-from agent import run_agent, PineScriptResult, get_openai_api_key
+from agent import PineScriptResult, get_openai_api_key, run_agent
 
 load_dotenv(override=True)
 
@@ -66,7 +67,7 @@ class InteractiveAgent:
 
             if result and isinstance(result.output, PineScriptResult):
                 print("\n" + "=" * 80)
-                print(result.output.response)           # v2: .output (was .data)
+                print(result.output.response)  # v2: .output (was .data)
                 print("=" * 80)
 
                 # Accumulate history so the next turn sees all prior context
