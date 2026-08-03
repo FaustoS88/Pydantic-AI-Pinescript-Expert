@@ -319,6 +319,10 @@ DATABASE_URL=postgresql://username:password@hostname:port/database
 
 Contributions are welcome!
 
+## Related Projects
+
+- [tickerflow](https://github.com/FaustoS88/tickerflow) — One async Python call for crypto, stocks, and forex OHLCV data with automatic provider fallback, pandas DataFrame support, and Pydantic AI agent integration.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
