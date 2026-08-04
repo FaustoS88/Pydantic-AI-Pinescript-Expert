@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" width="760" height="320" role="img" aria-label="Star history: 62 stars from Mar 2025 to Aug 2026">
+<style>
+  .lbl{font:400 11px -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;}
+  .val{font:600 13px -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;}
+  @media (prefers-color-scheme:dark){
+    .grid{stroke:#2a313c;}
+    .lbl,.val{fill:#9198a1;}
+    .ln{stroke:#4493f8;}
+    .dot{fill:#4493f8;stroke:#0d1117;}
+    .fade-a{stop-color:#4493f8;}
+    .fade-b{stop-color:#4493f8;}
+  }
+</style>
+<defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop class="fade-a" offset="0%" stop-color="#0969da" stop-opacity="0.20"/><stop class="fade-b" offset="100%" stop-color="#0969da" stop-opacity="0"/></linearGradient></defs>
+<line class="grid" x1="52" y1="278.0" x2="698" y2="278.0" stroke="#d8dee4" stroke-width="1"/>
+<text class="lbl" x="42" y="282.0" text-anchor="end" fill="#59636e">0</text>
+<line class="grid" x1="52" y1="201.5" x2="698" y2="201.5" stroke="#d8dee4" stroke-width="1"/>
+<text class="lbl" x="42" y="205.5" text-anchor="end" fill="#59636e">20</text>
+<line class="grid" x1="52" y1="125.1" x2="698" y2="125.1" stroke="#d8dee4" stroke-width="1"/>
+<text class="lbl" x="42" y="129.1" text-anchor="end" fill="#59636e">40</text>
+<line class="grid" x1="52" y1="48.6" x2="698" y2="48.6" stroke="#d8dee4" stroke-width="1"/>
+<text class="lbl" x="42" y="52.6" text-anchor="end" fill="#59636e">60</text>
+<text class="lbl" x="74.8" y="298" text-anchor="middle" fill="#59636e">Apr '25</text>
+<text class="lbl" x="190.6" y="298" text-anchor="middle" fill="#59636e">Jul '25</text>
+<text class="lbl" x="307.6" y="298" text-anchor="middle" fill="#59636e">Oct '25</text>
+<text class="lbl" x="424.6" y="298" text-anchor="middle" fill="#59636e">Jan '26</text>
+<text class="lbl" x="539.1" y="298" text-anchor="middle" fill="#59636e">Apr '26</text>
+<text class="lbl" x="654.9" y="298" text-anchor="middle" fill="#59636e">Jul '26</text>
+<polygon points="52.0,278.0 52.0,278.0 52.0,274.2 127.6,270.4 151.2,266.5 154.7,262.7 156.0,258.9 160.4,255.1 164.7,251.2 167.3,247.4 187.4,243.6 187.5,239.8 196.7,235.9 198.8,232.1 202.3,228.3 209.2,224.5 245.1,220.7 249.7,216.8 254.1,213.0 300.3,209.2 306.3,205.4 306.5,201.5 312.0,197.7 335.1,193.9 371.9,190.1 396.2,186.2 398.0,182.4 410.2,178.6 438.6,174.8 459.1,171.0 468.9,167.1 476.4,163.3 476.5,159.5 483.9,155.7 485.2,151.8 492.0,148.0 496.1,144.2 501.9,140.4 503.2,136.5 507.2,132.7 508.2,128.9 511.0,125.1 524.5,121.2 525.9,117.4 527.2,113.6 529.2,109.8 531.8,106.0 532.3,102.1 554.2,98.3 562.5,94.5 563.1,90.7 574.3,86.8 574.5,83.0 598.0,79.2 600.9,75.4 604.5,71.5 609.6,67.7 613.3,63.9 640.5,60.1 659.8,56.3 667.2,52.4 675.8,48.6 685.0,44.8 698.0,41.0 698.0,278.0" fill="url(#fade)"/>
+<polyline class="ln" points="52.0,278.0 52.0,274.2 127.6,270.4 151.2,266.5 154.7,262.7 156.0,258.9 160.4,255.1 164.7,251.2 167.3,247.4 187.4,243.6 187.5,239.8 196.7,235.9 198.8,232.1 202.3,228.3 209.2,224.5 245.1,220.7 249.7,216.8 254.1,213.0 300.3,209.2 306.3,205.4 306.5,201.5 312.0,197.7 335.1,193.9 371.9,190.1 396.2,186.2 398.0,182.4 410.2,178.6 438.6,174.8 459.1,171.0 468.9,167.1 476.4,163.3 476.5,159.5 483.9,155.7 485.2,151.8 492.0,148.0 496.1,144.2 501.9,140.4 503.2,136.5 507.2,132.7 508.2,128.9 511.0,125.1 524.5,121.2 525.9,117.4 527.2,113.6 529.2,109.8 531.8,106.0 532.3,102.1 554.2,98.3 562.5,94.5 563.1,90.7 574.3,86.8 574.5,83.0 598.0,79.2 600.9,75.4 604.5,71.5 609.6,67.7 613.3,63.9 640.5,60.1 659.8,56.3 667.2,52.4 675.8,48.6 685.0,44.8 698.0,41.0" fill="none" stroke="#0969da" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="dot" cx="698.0" cy="41.0" r="4" fill="#0969da" stroke="#ffffff" stroke-width="2"/>
+<text class="val" x="708.0" y="45.0" fill="#59636e">62</text>
+</svg>

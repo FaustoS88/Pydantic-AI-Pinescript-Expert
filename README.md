@@ -309,7 +309,7 @@ DATABASE_URL=postgresql://username:password@hostname:port/database
 ```
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=faustos88/pydantic-ai-pinescript-expert&type=Date)](https://star-history.com/#FaustoS88/Pydantic-AI-Pinescript-Expert&Date)
+[![Star History Chart](assets/star-history.svg)](https://star-history.com/#FaustoS88/Pydantic-AI-Pinescript-Expert&Date)
 
 ## Contributors
 
