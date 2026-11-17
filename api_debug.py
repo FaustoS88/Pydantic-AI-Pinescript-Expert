@@ -15,6 +15,8 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
+from config import configured_key
+
 # Load environment variables
 load_dotenv(override=True)
 
@@ -36,7 +38,7 @@ async def main():
     print(f"OPENAI_API_KEY from environment: {masked_key}")
 
     # Check for malformed placeholders
-    if api_key in ["YOUR_OPENAI_API_KEY", "sk-...", "YOUR_OPE***_API"] or not api_key:
+    if not configured_key("OPENAI_API_KEY"):
         print("WARNING: API key appears to be a placeholder or is missing!")
 
         # Prompt for key

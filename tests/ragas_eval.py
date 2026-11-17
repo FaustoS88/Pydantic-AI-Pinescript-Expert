@@ -36,7 +36,7 @@ from openai import AsyncOpenAI
 # ---------------------------------------------------------------------------
 # Boot
 # ---------------------------------------------------------------------------
-load_dotenv(override=True)
+load_dotenv()  # variables exported in the shell take precedence over .env
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,10 +54,13 @@ from config import (  # noqa: E402
     EMBEDDING_MODEL,
     HYBRID_SEARCH_ALPHA,
     MMR_LAMBDA,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_DEFAULT_MODEL,
     RERANK_TOP_N,
     RETRIEVAL_CANDIDATES,
     SIMILARITY_THRESHOLD,
     VECTOR_SEARCH_LIMIT,
+    configured_key,
 )
 from rag_utils import hybrid_retrieve  # noqa: E402
 
@@ -65,9 +68,6 @@ TESTSET_PATH = SCRIPT_DIR / "ragas_testset.json"
 RESULTS_DIR = PROJECT_ROOT / "results"
 
 CATEGORIES = ["function_lookup", "conceptual", "code_generation", "complex"]
-
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = os.getenv("OPENROUTER_DEFAULT_MODEL", "openai/gpt-4.1-mini")
 
 SYSTEM_PROMPT = (
     "You are a Pine Script v6 expert assistant. Pine Script is the programming "
@@ -143,7 +143,7 @@ async def generate_answer(
     http_client: httpx.AsyncClient,
 ) -> str:
     """Call OpenRouter directly with retrieved contexts and return the answer."""
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    openrouter_api_key = configured_key("OPENROUTER_API_KEY")
     if not openrouter_api_key:
         return "[ERROR] OPENROUTER_API_KEY not set"
 
@@ -159,7 +159,7 @@ async def generate_answer(
                 "Content-Type": "application/json",
             },
             json={
-                "model": OPENROUTER_MODEL,
+                "model": OPENROUTER_DEFAULT_MODEL,
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_msg},
@@ -365,7 +365,7 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
     logger.info("Loaded %d questions from %s", len(testset), TESTSET_PATH)
     logger.info("Retrieval mode: %s", retrieval_mode)
 
-    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_api_key = configured_key("OPENAI_API_KEY")
     if not openai_api_key:
         logger.error("OPENAI_API_KEY is not set. Aborting.")
         sys.exit(1)
@@ -454,7 +454,7 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
         "embedding_model": EMBEDDING_MODEL,
         "retrieval_limit": VECTOR_SEARCH_LIMIT if retrieval_mode == "baseline" else RERANK_TOP_N,
         "retrieval_method": RETRIEVAL_METHODS[retrieval_mode],
-        "generation_model": OPENROUTER_MODEL,
+        "generation_model": OPENROUTER_DEFAULT_MODEL,
         "db_url": db_url.split("@")[-1],  # mask credentials
     }
 

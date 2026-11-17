@@ -5,7 +5,6 @@ This script provides a convenient way to run different commands.
 """
 
 import asyncio
-import os
 import sys
 
 from dotenv import load_dotenv
@@ -19,10 +18,7 @@ def print_usage():
     print("Usage:")
     print("  python run.py interactive [--model PRESET]  - Run the interactive shell")
     print("  python run.py query <query> [--model PRESET] - Run a single query")
-    print(
-        "  python run.py populate <docs_dir>            - Populate the database with documentation"
-    )
-    print("  python run.py check                          - Check the database setup")
+    print("  python run.py check                         - Check the database setup")
     print()
     print("Model presets (via --model):")
     print("  default  - openai/gpt-4.1-mini")
@@ -50,12 +46,11 @@ async def check_database():
                 if count == 0:
                     print(
                         "Warning: No documentation found in database. "
-                        "Run 'python run.py populate <docs_dir>' to add documentation."
+                        "Run 'python pinescript_crawler.py' to add documentation."
                     )
             else:
                 print(
-                    "Database schema is not valid. "
-                    "Run 'python run.py populate <docs_dir>' to set up the database."
+                    "Database schema is not valid. Run 'python init_db.py' to set up the database."
                 )
     except Exception as e:
         print(f"Error checking database: {e}")
@@ -111,21 +106,6 @@ async def run_command(command, args):
             print("\nResponse:")
             print(result.output.response)
 
-    elif command == "populate":
-        if not args:
-            print("Error: No docs directory provided")
-            print("Usage: python run.py populate <docs_dir>")
-            return
-
-        docs_dir = args[0]
-        if not os.path.exists(docs_dir):
-            print(f"Error: Directory {docs_dir} does not exist")
-            return
-
-        from populate_db import build_search_db
-
-        await build_search_db(docs_dir)
-
     elif command == "check":
         await check_database()
 
@@ -136,7 +116,7 @@ async def run_command(command, args):
 
 def main():
     """Main entry point"""
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 2 or {"-h", "--help"} & set(sys.argv[1:]):
         print_usage()
         return
 

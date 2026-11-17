@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 import sys
 
@@ -39,6 +38,7 @@ from config import (  # noqa: E402
     EMBEDDING_MODEL,
     MAX_PAGE_CONTEXT_CHARS,
     OPENROUTER_BASE_URL,
+    configured_key,
 )
 from db_schema import create_schema, run_migration  # noqa: E402
 from rag_utils import (  # noqa: E402
@@ -305,7 +305,7 @@ async def clear_database() -> None:
 
 
 async def run_recrawl() -> None:
-    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_api_key = configured_key("OPENAI_API_KEY")
     if not openai_api_key:
         logger.error("OPENAI_API_KEY not set")
         sys.exit(1)
@@ -317,7 +317,7 @@ async def run_recrawl() -> None:
     # Contextual prefix client — uses OpenRouter for cheaper LLM access
     contextual_client: AsyncOpenAI | None = None
     if _CONTEXTUAL_MODE:
-        openrouter_key = os.getenv("OPENROUTER_API_KEY") or openai_api_key
+        openrouter_key = configured_key("OPENROUTER_API_KEY") or openai_api_key
         contextual_client = AsyncOpenAI(
             api_key=openrouter_key,
             base_url=OPENROUTER_BASE_URL,

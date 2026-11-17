@@ -27,7 +27,6 @@ This document provides a comprehensive overview of all the scripts in the PineSc
 - Creates a virtual environment
 - Installs dependencies from requirements.txt
 - Sets up the .env file from the template
-- Makes the shell script executable
 **Usage**: Run this first when setting up a new installation.
 
 ### 4. `init_db.py`

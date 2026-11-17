@@ -44,6 +44,7 @@ from config import (
     RETRIEVAL_CANDIDATES,
     SIMILARITY_THRESHOLD,
     THINKING_EFFORT,
+    configured_key,
     get_preset,
 )
 from rag_utils import hybrid_retrieve
@@ -58,16 +59,8 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# API key helpers
+# API key helper
 # ---------------------------------------------------------------------------
-
-
-def configured_key(name: str) -> str | None:
-    """The key in env var `name`, or None when it is missing or a template placeholder."""
-    value = os.getenv(name)
-    if not value or "your_" in value.lower() or value == "sk-...":
-        return None
-    return value
 
 
 def get_openai_api_key() -> str:

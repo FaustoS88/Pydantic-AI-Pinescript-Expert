@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/FaustoS88/Pydantic-AI-Pinescript-Expert?style=social)](https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert)
 [![GitHub Forks](https://img.shields.io/github/forks/FaustoS88/Pydantic-AI-Pinescript-Expert?style=social)](https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert/network/members)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serves as an expert on Pine Script v6, TradingView's programming language for custom indicators and strategies. This agent leverages vector search technology and large language models to provide accurate, context-aware answers and generate working code examples.
@@ -32,7 +32,7 @@ A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serv
 
 ## Prerequisites
 
-- **Python 3.9+**
+- **Python 3.11+**
 - **PostgreSQL** with pgvector extension
 - **OpenAI API key** (required for embeddings and default LLM)
 - **OpenRouter API key** (optional, for alternative LLM providers)
@@ -44,7 +44,7 @@ A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serv
 
    ```bash
    git clone https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert.git
-   cd pinescript-expert
+   cd Pydantic-AI-Pinescript-Expert
    ```
 
 2. **Setup PostgreSQL with pgvector using Docker**
@@ -65,6 +65,7 @@ docker run --name pinescript-pgvector \
 
    ```bash
    python setup.py
+   source venv/bin/activate  # on Windows: venv\Scripts\activate
    # Edit the created .env file with your API keys
    ```
 
@@ -225,7 +226,7 @@ the retriever finds the right chunks 92% of the time — the remaining gap is a 
 (docs lack complete strategy templates), not a retrieval problem.
 
 **Tier 1 improvements** ([docs](docs/RAG_IMPROVEMENTS.md)):
-hybrid BM25+vector search, similarity threshold, cross-encoder reranking, recursive chunking with overlap, MMR deduplication, contextual chunk headers
+hybrid BM25+vector search, similarity threshold, cross-encoder reranking (available, off in the agent because it lowered faithfulness), recursive chunking with overlap, MMR deduplication, contextual chunk headers
 
 **Tier 2 improvements** ([docs](docs/RAG_IMPROVEMENTS_TIER2.md)):
 code-aware chunking (fenced blocks never split), Anthropic Contextual Retrieval (LLM prefix per chunk at crawl time), content type detection, metadata columns
@@ -290,15 +291,35 @@ python run.py query "Explain ta.sma()" --model "anthropic/claude-sonnet-4.6"
 
 All presets route through [OpenRouter](https://openrouter.ai/) — add your API key to `.env` as `OPENROUTER_API_KEY`. Without it, the agent falls back to the default OpenAI model.
 
-You can also override defaults via environment variables:
+### Environment Variables
 
-```bash
-PINESCRIPT_MODEL=openai:gpt-4o          # default LLM
-PINESCRIPT_TEMPERATURE=0.3              # response creativity
-PINESCRIPT_MAX_TOKENS=4096              # max response length
-PINESCRIPT_VECTOR_SEARCH_LIMIT=12       # RAG retrieval depth
-OPENROUTER_MODEL=anthropic/claude-opus-4-6  # default OpenRouter model
-```
+Copy `.env.example` to `.env` (`setup.py` does it) and fill in your keys. A variable missing from `.env` can also come from the environment; when the API keys or `DATABASE_URL` are set in both, the app and the crawlers use the `.env` value. Only `OPENAI_API_KEY` is required, and the `DATABASE_URL` default matches the Docker command in the Quick Start.
+
+| Variable | Default | What it does |
+|----------|---------|--------------|
+| `OPENAI_API_KEY` | none, required | Embeddings, and the answers when `OPENROUTER_API_KEY` is not set |
+| `OPENROUTER_API_KEY` | not set | Sends the answers through OpenRouter; `--model` presets and `--contextual` need it |
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:54322/postgres` | pgvector database |
+| `PINESCRIPT_MODEL` | `openai:gpt-4o-mini` | Answer model without `OPENROUTER_API_KEY` |
+| `OPENROUTER_MODEL` | `openai/gpt-4.1-mini` | Answer model with `OPENROUTER_API_KEY` and no `--model` |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter endpoint |
+| `PINESCRIPT_TEMPERATURE` | `0.2` | Answer temperature; a `--model` preset uses its own |
+| `PINESCRIPT_MAX_TOKENS` | `2000` | Maximum tokens per answer; a `--model` preset uses its own |
+| `PINESCRIPT_THINKING_EFFORT` | `high` | Reasoning effort: `low`, `medium` or `high` |
+| `PINESCRIPT_EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model for the chunks and the questions, see below |
+| `PINESCRIPT_RETRIEVAL_CANDIDATES` | `15` | Chunks fetched from the database per search |
+| `PINESCRIPT_SIMILARITY_THRESHOLD` | `0.3` | Minimum cosine similarity of a fetched chunk |
+| `PINESCRIPT_HYBRID_ALPHA` | `0.5` | Vector vs BM25 weight in the rank fusion (1.0 = vector only) |
+| `PINESCRIPT_RERANK_TOP_N` | `15` | Chunks given to the agent per search |
+| `PINESCRIPT_MMR_LAMBDA` | `0.7` | Relevance vs diversity when picking them (1.0 = relevance only) |
+| `PINESCRIPT_RERANK_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Cross-encoder for reranking, which the agent leaves off ([Tier 1](docs/ragas_tier1_comparison.md)) |
+| `PINESCRIPT_CHUNK_SIZE` | `1000` | Chunk size in characters when crawling |
+| `PINESCRIPT_CHUNK_OVERLAP` | `100` | Characters shared by neighbouring chunks when crawling |
+| `PINESCRIPT_CONTEXTUAL_MODEL` | `openai/gpt-4.1-mini` | OpenRouter model that writes each chunk's context with `--contextual` |
+| `PINESCRIPT_MAX_PAGE_CONTEXT_CHARS` | `8000` | Page characters sent with each chunk with `--contextual` |
+| `PINESCRIPT_VECTOR_SEARCH_LIMIT` | `8` | Results of `tests/ragas_eval.py --retrieval baseline`; the agent does not use it |
+
+`PINESCRIPT_EMBEDDING_MODEL` must return 1536 dimensions, the size of the `embedding` column in `db_schema.py`, so a model with another size fails until that column changes. Above 2,000 dimensions, as with `text-embedding-3-large` (3,072), the HNSW index there has to change too, because pgvector indexes `vector` columns up to 2,000 dimensions. The stored chunks and the questions must come from the same model: after changing it, empty the table with `python clear_database.py` and crawl again.
 
 ### Custom Database Connection
 
@@ -334,3 +355,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [OpenAI](https://openai.com/) and [OpenRouter](https://openrouter.ai/) for LLM capabilities
 - [pgvector](https://github.com/pgvector/pgvector) for vector search functionality
 - [Streamlit](https://streamlit.io/) for the web interface
+
+This project uses Crawl4AI (https://github.com/unclecode/crawl4ai) for web data extraction.
