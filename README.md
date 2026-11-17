@@ -355,3 +355,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [OpenAI](https://openai.com/) and [OpenRouter](https://openrouter.ai/) for LLM capabilities
 - [pgvector](https://github.com/pgvector/pgvector) for vector search functionality
 - [Streamlit](https://streamlit.io/) for the web interface
+
+This project uses Crawl4AI (https://github.com/unclecode/crawl4ai) for web data extraction.
