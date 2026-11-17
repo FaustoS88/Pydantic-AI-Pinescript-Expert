@@ -116,7 +116,7 @@ async def run_command(command, args):
 
 def main():
     """Main entry point"""
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 2 or {"-h", "--help"} & set(sys.argv[1:]):
         print_usage()
         return
 
