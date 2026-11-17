@@ -60,6 +60,7 @@ from config import (  # noqa: E402
     RETRIEVAL_CANDIDATES,
     SIMILARITY_THRESHOLD,
     VECTOR_SEARCH_LIMIT,
+    configured_key,
 )
 from rag_utils import hybrid_retrieve  # noqa: E402
 
@@ -142,7 +143,7 @@ async def generate_answer(
     http_client: httpx.AsyncClient,
 ) -> str:
     """Call OpenRouter directly with retrieved contexts and return the answer."""
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    openrouter_api_key = configured_key("OPENROUTER_API_KEY")
     if not openrouter_api_key:
         return "[ERROR] OPENROUTER_API_KEY not set"
 
@@ -364,7 +365,7 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
     logger.info("Loaded %d questions from %s", len(testset), TESTSET_PATH)
     logger.info("Retrieval mode: %s", retrieval_mode)
 
-    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_api_key = configured_key("OPENAI_API_KEY")
     if not openai_api_key:
         logger.error("OPENAI_API_KEY is not set. Aborting.")
         sys.exit(1)

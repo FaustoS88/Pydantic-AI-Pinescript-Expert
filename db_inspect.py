@@ -7,7 +7,6 @@ check vector quality, and perform test searches without running the full agent.
 """
 
 import asyncio
-import os
 import sys
 
 import pydantic_core
@@ -15,7 +14,7 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from agent import database_connect
-from config import EMBEDDING_MODEL
+from config import EMBEDDING_MODEL, configured_key
 
 # Load environment variables
 load_dotenv()
@@ -64,9 +63,9 @@ async def view_document(doc_id):
 async def test_search(query):
     """Test search functionality"""
     # Initialize OpenAI client
-    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_api_key = configured_key("OPENAI_API_KEY")
     if not openai_api_key:
-        print("Error: OPENAI_API_KEY not found in environment variables")
+        print("Error: OPENAI_API_KEY is not set or has a placeholder value")
         return
 
     openai = AsyncOpenAI(api_key=openai_api_key)

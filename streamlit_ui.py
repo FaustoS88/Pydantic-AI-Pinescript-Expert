@@ -21,13 +21,8 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserProm
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
 
-from agent import (  # noqa: E402
-    Dependencies,
-    configured_key,
-    database_connect,
-    pinescript_agent,
-    resolve_model,
-)
+from agent import Dependencies, database_connect, pinescript_agent, resolve_model  # noqa: E402
+from config import configured_key  # noqa: E402
 from db_schema import validate_schema  # noqa: E402
 
 load_dotenv(override=True)

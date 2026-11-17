@@ -117,3 +117,16 @@ MODEL_PRESETS: dict[str, dict[str, str | float | int]] = {
 def get_preset(name: str) -> dict[str, str | float | int]:
     """Return a model preset by name, falling back to 'default'."""
     return MODEL_PRESETS.get(name, MODEL_PRESETS["default"])
+
+
+# ---------------------------------------------------------------------------
+# API keys, read when used rather than at import like the settings above
+# ---------------------------------------------------------------------------
+
+
+def configured_key(name: str) -> str | None:
+    """The key in env var `name`, or None when it is missing or a template placeholder."""
+    value = os.getenv(name)
+    if not value or "your_" in value.lower() or value == "sk-...":
+        return None
+    return value

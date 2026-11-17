@@ -22,7 +22,7 @@ load_dotenv(override=True)
 
 # Import database setup functions
 from agent import database_connect  # noqa: E402
-from config import CHUNK_OVERLAP, CHUNK_SIZE, EMBEDDING_MODEL  # noqa: E402
+from config import CHUNK_OVERLAP, CHUNK_SIZE, EMBEDDING_MODEL, configured_key  # noqa: E402
 from db_schema import create_schema, run_migration  # noqa: E402
 from rag_utils import prepend_chunk_header, recursive_character_split  # noqa: E402
 
@@ -44,9 +44,9 @@ class PineScriptDocsCrawler:
         self.visited_urls: set[str] = set()
 
         # Initialize OpenAI client for embeddings
-        openai_api_key = os.getenv("OPENAI_API_KEY")
+        openai_api_key = configured_key("OPENAI_API_KEY")
         if not openai_api_key:
-            logger.warning("OPENAI_API_KEY environment variable is not found!")
+            logger.warning("OPENAI_API_KEY is not set or has a placeholder value.")
             print("Please enter your OpenAI API key:")
             openai_api_key = input("> ")
             if not openai_api_key:
