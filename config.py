@@ -59,11 +59,6 @@ CHUNK_OVERLAP = int(os.getenv("PINESCRIPT_CHUNK_OVERLAP", "100"))
 # Tier 2 — Contextual Retrieval settings
 # ---------------------------------------------------------------------------
 
-# Enable LLM-generated context prefix per chunk at crawl time (--contextual flag)
-CONTEXTUAL_RETRIEVAL_ENABLED: bool = (
-    os.getenv("PINESCRIPT_CONTEXTUAL_RETRIEVAL", "false").lower() == "true"
-)
-
 # LLM model for generating contextual prefixes (any OpenRouter-compatible ID)
 CONTEXTUAL_MODEL: str = os.getenv("PINESCRIPT_CONTEXTUAL_MODEL", "openai/gpt-4.1-mini")
 
