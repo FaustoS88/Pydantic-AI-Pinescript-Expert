@@ -6,5 +6,7 @@ python-dotenv>=1.0.1
 pydantic>=2.6.0
 streamlit>=1.28.0
 crawl4ai>=0.4.247
+beautifulsoup4>=4.12.0
+html2text>=2020.1.16
 sentence-transformers>=3.0.0
 numpy>=1.26.0
