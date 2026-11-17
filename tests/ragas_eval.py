@@ -36,7 +36,7 @@ from openai import AsyncOpenAI
 # ---------------------------------------------------------------------------
 # Boot
 # ---------------------------------------------------------------------------
-load_dotenv(override=True)
+load_dotenv()  # variables exported in the shell take precedence over .env
 
 logging.basicConfig(
     level=logging.INFO,
