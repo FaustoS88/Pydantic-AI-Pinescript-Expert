@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from agent import database_connect
+from config import EMBEDDING_MODEL
 
 # Load environment variables
 load_dotenv()
@@ -74,7 +75,7 @@ async def test_search(query):
     print(f"Generating embedding for query: '{query}'")
     embedding = await openai.embeddings.create(
         input=query,
-        model="text-embedding-3-small",
+        model=EMBEDDING_MODEL,
     )
     embedding_vector = embedding.data[0].embedding
     embedding_json = pydantic_core.to_json(embedding_vector).decode()

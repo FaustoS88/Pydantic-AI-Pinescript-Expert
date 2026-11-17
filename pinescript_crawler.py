@@ -22,7 +22,7 @@ load_dotenv(override=True)
 
 # Import database setup functions
 from agent import database_connect  # noqa: E402
-from config import CHUNK_OVERLAP, CHUNK_SIZE  # noqa: E402
+from config import CHUNK_OVERLAP, CHUNK_SIZE, EMBEDDING_MODEL  # noqa: E402
 from db_schema import create_schema, run_migration  # noqa: E402
 from rag_utils import prepend_chunk_header, recursive_character_split  # noqa: E402
 
@@ -270,9 +270,7 @@ class PineScriptDocsCrawler:
                     logger.debug("Truncating text from %d to %d characters", len(text), max_length)
                     text = text[:max_length]
 
-                response = await self.openai.embeddings.create(
-                    input=text, model="text-embedding-3-small"
-                )
+                response = await self.openai.embeddings.create(input=text, model=EMBEDDING_MODEL)
                 return response.data[0].embedding
             except Exception as e:
                 logger.error("Error generating embedding: %s", e)
