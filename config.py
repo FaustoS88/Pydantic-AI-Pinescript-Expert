@@ -8,6 +8,11 @@ from __future__ import annotations
 
 import os
 
+from dotenv import load_dotenv
+
+# Load .env here: agent, interactive and streamlit_ui import config before their own load_dotenv()
+load_dotenv()
+
 # ---------------------------------------------------------------------------
 # LLM settings
 # ---------------------------------------------------------------------------
