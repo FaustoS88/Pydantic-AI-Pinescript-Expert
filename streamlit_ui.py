@@ -21,7 +21,13 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserProm
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
 
-from agent import Dependencies, configured_key, database_connect, pinescript_agent  # noqa: E402
+from agent import (  # noqa: E402
+    Dependencies,
+    configured_key,
+    database_connect,
+    pinescript_agent,
+    resolve_model,
+)
 from db_schema import validate_schema  # noqa: E402
 
 load_dotenv(override=True)
@@ -135,6 +141,7 @@ async def process_query(prompt: str, history: list[dict]):
                 prompt,
                 deps=deps,
                 message_history=model_history,
+                model=resolve_model(),  # OpenRouter when its key is set, like the CLI
             )
             return result.output.response, result.output.snippets_used
 
