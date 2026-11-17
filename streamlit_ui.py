@@ -21,7 +21,7 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserProm
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
 
-from agent import Dependencies, database_connect, pinescript_agent  # noqa: E402
+from agent import Dependencies, configured_key, database_connect, pinescript_agent  # noqa: E402
 from db_schema import validate_schema  # noqa: E402
 
 load_dotenv(override=True)
@@ -99,8 +99,8 @@ if "messages" not in st.session_state:
 
 
 async def verify_setup():
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key or openai_api_key in ("YOUR_OPENAI_API_KEY", "sk-...", ""):
+    openai_api_key = configured_key("OPENAI_API_KEY")
+    if not openai_api_key:
         st.sidebar.error("⚠️ OpenAI API key not configured.")
         return False, None, 0
 
@@ -153,7 +153,7 @@ if setup_ok:
 else:
     st.sidebar.warning("⚠️ Setup incomplete. Check errors above.")
 
-if os.getenv("OPENROUTER_API_KEY"):
+if configured_key("OPENROUTER_API_KEY"):
     st.sidebar.success("✅ Using OpenRouter for queries")
 else:
     st.sidebar.info("Using OpenAI for queries (no OpenRouter key found)")

@@ -144,6 +144,10 @@ class TestResolveModel:
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         assert resolve_model() is None
 
+    def test_placeholder_key_counts_as_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "your_openrouter_api_key_here")
+        assert resolve_model() is None
+
     def test_uses_openrouter_default_with_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
         model = resolve_model()

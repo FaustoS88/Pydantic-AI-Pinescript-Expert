@@ -56,15 +56,23 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# API key helper (unchanged from v1)
+# API key helpers
 # ---------------------------------------------------------------------------
+
+
+def configured_key(name: str) -> str | None:
+    """The key in env var `name`, or None when it is missing or a template placeholder."""
+    value = os.getenv(name)
+    if not value or "your_" in value.lower() or value == "sk-...":
+        return None
+    return value
 
 
 def get_openai_api_key() -> str:
     """Get OpenAI API key with validation and interactive prompt if needed."""
-    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_api_key = configured_key("OPENAI_API_KEY")
 
-    if not openai_api_key or "YOUR_" in openai_api_key or openai_api_key == "sk-...":
+    if not openai_api_key:
         logger.warning("OPENAI_API_KEY is not set or has a placeholder value.")
         print("Please enter your OpenAI API key:")
         openai_api_key = input("> ")
@@ -249,7 +257,7 @@ def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
 
     Returns None to use the agent's default model (OpenAI).
     """
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    openrouter_api_key = configured_key("OPENROUTER_API_KEY")
 
     if preset:
         from config import MODEL_PRESETS, get_preset
