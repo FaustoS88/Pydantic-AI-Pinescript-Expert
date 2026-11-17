@@ -60,22 +60,6 @@ def create_env_file():
     print("Please edit the .env file to add your API keys and database URL")
 
 
-def make_script_executable():
-    """Make the shell script executable"""
-    script_path = Path("pinescript-agent.sh")
-
-    if not script_path.exists():
-        print("Error: pinescript-agent.sh not found")
-        return
-
-    try:
-        script_path.chmod(0o755)
-        print("Made pinescript-agent.sh executable")
-    except Exception as e:
-        print(f"Error making script executable: {e}")
-        print("You may need to run: chmod +x pinescript-agent.sh")
-
-
 def main():
     """Main entry point"""
     print("Setting up Pine Script Expert Agent...")
@@ -86,15 +70,14 @@ def main():
     # Create .env file
     create_env_file()
 
-    # Make script executable
-    make_script_executable()
-
+    activate = r"venv\Scripts\activate" if sys.platform == "win32" else "source venv/bin/activate"
     print("\nSetup complete!")
     print("\nNext steps:")
-    print("1. Edit the .env file to add your API keys and database URL")
-    print("2. Run the database setup: python run.py check")
-    print("3. Populate the database: python run.py populate <docs_dir>")
-    print("4. Start the interactive shell: python run.py interactive")
+    print(f"1. Activate the virtual environment: {activate}")
+    print("2. Edit the .env file to add your API keys and database URL")
+    print("3. Initialize the database: python init_db.py")
+    print("4. Populate the database: python pinescript_crawler.py")
+    print("5. Start the interactive shell: python run.py interactive")
 
 
 if __name__ == "__main__":
