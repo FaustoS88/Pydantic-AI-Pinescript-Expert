@@ -13,6 +13,7 @@ from agent import (
     pinescript_rag,
     resolve_model,
     retrieve,
+    run_agent,
 )
 from config import EMBEDDING_MODEL, OPENROUTER_DEFAULT_MODEL
 from rag_utils import RetrievedDoc
@@ -41,8 +42,8 @@ def _doc(url: str, title: str, content: str) -> RetrievedDoc:
 # ---------------------------------------------------------------------------
 # retrieve() tool tests
 #
-# retrieve() delegates the whole vector + BM25 → RRF → threshold → rerank →
-# MMR pipeline to rag_utils.hybrid_retrieve (covered in test_rag_improvements),
+# retrieve() delegates the whole vector + BM25 → RRF → threshold → MMR pipeline
+# (reranking off) to rag_utils.hybrid_retrieve (covered in test_rag_improvements),
 # so these tests patch it and assert the tool's own contract: formatting,
 # the empty case, and error handling.
 # ---------------------------------------------------------------------------
@@ -89,6 +90,7 @@ class TestRetrieveTool:
         assert kwargs["pool"] is deps.pool
         assert kwargs["openai_client"] is deps.openai
         assert kwargs["embedding_model"] == EMBEDDING_MODEL
+        assert kwargs["enable_rerank"] is False
 
     @pytest.mark.asyncio
     async def test_handles_retrieval_error(self) -> None:
@@ -144,6 +146,10 @@ class TestResolveModel:
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         assert resolve_model() is None
 
+    def test_placeholder_key_counts_as_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "your_openrouter_api_key_here")
+        assert resolve_model() is None
+
     def test_uses_openrouter_default_with_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
         model = resolve_model()
@@ -169,3 +175,29 @@ class TestResolveModel:
     ) -> None:
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         assert resolve_model("flash") is None
+
+
+# ---------------------------------------------------------------------------
+# run_agent — a preset's temperature and max tokens reach the run.
+# ---------------------------------------------------------------------------
+
+
+class TestRunAgentPresets:
+    @pytest.mark.asyncio
+    async def test_preset_settings_reach_the_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from config import get_preset
+
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+        with (
+            patch("agent.get_openai_api_key", return_value="sk-test"),
+            patch("agent.database_connect"),
+            patch("agent.pinescript_agent") as fake_agent,
+        ):
+            fake_agent.run = AsyncMock()
+            await run_agent("How do I plot an SMA?", preset="codex")
+
+        preset = get_preset("codex")
+        assert fake_agent.run.call_args.kwargs["model_settings"] == {
+            "temperature": preset["temperature"],
+            "max_tokens": preset["max_tokens"],
+        }

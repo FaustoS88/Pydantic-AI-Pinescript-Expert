@@ -178,7 +178,6 @@ Configuration via environment variables:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `PINESCRIPT_CONTEXTUAL_RETRIEVAL` | `false` | Enable LLM prefix at crawl time |
 | `PINESCRIPT_CONTEXTUAL_MODEL` | `openai/gpt-4.1-mini` | LLM for prefix generation |
 | `PINESCRIPT_MAX_PAGE_CONTEXT_CHARS` | `8000` | Page excerpt size sent to LLM |
 

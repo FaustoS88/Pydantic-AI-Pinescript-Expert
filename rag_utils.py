@@ -23,6 +23,7 @@ from config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     CONTEXTUAL_MODEL,
+    EMBEDDING_MODEL,
     HYBRID_SEARCH_ALPHA,
     MAX_PAGE_CONTEXT_CHARS,
     MMR_LAMBDA,
@@ -414,7 +415,7 @@ async def hybrid_retrieve(
     pool,
     openai_client,
     query: str,
-    embedding_model: str = "text-embedding-3-small",
+    embedding_model: str = EMBEDDING_MODEL,
     candidates: int = RETRIEVAL_CANDIDATES,
     alpha: float = HYBRID_SEARCH_ALPHA,
     threshold: float = SIMILARITY_THRESHOLD,
@@ -435,7 +436,8 @@ async def hybrid_retrieve(
         threshold: Minimum cosine similarity to keep a result.
         top_n: Final number of results to return.
         mmr_lambda: MMR diversity parameter.
-        enable_rerank: Whether to use cross-encoder reranking.
+        enable_rerank: Whether to use cross-encoder reranking; the agent passes False
+            because it lowered faithfulness in the Tier 1 evaluation.
         enable_mmr: Whether to use MMR deduplication.
 
     Returns:

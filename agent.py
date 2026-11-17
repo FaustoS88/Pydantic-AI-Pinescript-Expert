@@ -37,12 +37,14 @@ from config import (
     LLM_MAX_TOKENS,
     LLM_TEMPERATURE,
     MMR_LAMBDA,
+    MODEL_PRESETS,
     OPENROUTER_BASE_URL,
     OPENROUTER_DEFAULT_MODEL,
     RERANK_TOP_N,
     RETRIEVAL_CANDIDATES,
     SIMILARITY_THRESHOLD,
     THINKING_EFFORT,
+    get_preset,
 )
 from rag_utils import hybrid_retrieve
 
@@ -56,15 +58,23 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# API key helper (unchanged from v1)
+# API key helpers
 # ---------------------------------------------------------------------------
+
+
+def configured_key(name: str) -> str | None:
+    """The key in env var `name`, or None when it is missing or a template placeholder."""
+    value = os.getenv(name)
+    if not value or "your_" in value.lower() or value == "sk-...":
+        return None
+    return value
 
 
 def get_openai_api_key() -> str:
     """Get OpenAI API key with validation and interactive prompt if needed."""
-    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_api_key = configured_key("OPENAI_API_KEY")
 
-    if not openai_api_key or "YOUR_" in openai_api_key or openai_api_key == "sk-...":
+    if not openai_api_key:
         logger.warning("OPENAI_API_KEY is not set or has a placeholder value.")
         print("Please enter your OpenAI API key:")
         openai_api_key = input("> ")
@@ -149,8 +159,7 @@ pinescript_rag = Capability(
 async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
     """Retrieve relevant Pine Script documentation using hybrid search.
 
-    Pipeline: vector + BM25 → RRF fusion → similarity threshold →
-    cross-encoder reranking → MMR deduplication.
+    Pipeline: vector + BM25 → RRF fusion → similarity threshold → MMR deduplication.
 
     Args:
         ctx: Run context with database pool and OpenAI client.
@@ -170,6 +179,7 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
             threshold=SIMILARITY_THRESHOLD,
             top_n=RERANK_TOP_N,
             mmr_lambda=MMR_LAMBDA,
+            enable_rerank=False,  # off as in the evaluations: ms-marco hurts code docs
         )
 
         if not docs:
@@ -249,11 +259,9 @@ def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
 
     Returns None to use the agent's default model (OpenAI).
     """
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    openrouter_api_key = configured_key("OPENROUTER_API_KEY")
 
     if preset:
-        from config import MODEL_PRESETS, get_preset
-
         if preset in MODEL_PRESETS:
             cfg = get_preset(preset)
             model_id = str(cfg["model"])
@@ -306,6 +314,13 @@ async def run_agent(question: str, preset: str | None = None, message_history=No
             run_kwargs: dict = {"deps": deps}
             if model is not None:
                 run_kwargs["model"] = model
+                if preset in MODEL_PRESETS:
+                    # a preset brings its own temperature and max tokens
+                    cfg = get_preset(preset)
+                    run_kwargs["model_settings"] = {
+                        "temperature": float(cfg["temperature"]),
+                        "max_tokens": int(cfg["max_tokens"]),
+                    }
             if message_history:
                 run_kwargs["message_history"] = message_history
 

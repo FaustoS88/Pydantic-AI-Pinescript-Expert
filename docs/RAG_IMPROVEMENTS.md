@@ -9,7 +9,7 @@ Six high-impact, low-effort improvements to the PineScript Expert retrieval pipe
 | 1 | Contextual Chunk Headers | +28% retrieval quality | Implemented |
 | 2 | Hybrid Search (BM25 + Vector) | +20-30% accuracy | Implemented |
 | 3 | Similarity Threshold | Eliminates irrelevant noise | Implemented |
-| 4 | Cross-Encoder Reranking | Major precision boost | Implemented |
+| 4 | Cross-Encoder Reranking | Major precision boost | Implemented, off in the agent |
 | 5 | Recursive Chunking + Overlap | Fixes truncation/context loss | Implemented |
 | 6 | MMR Deduplication | Eliminates redundant results | Implemented |
 
@@ -56,7 +56,7 @@ Previously returned 8 results regardless of relevance. Now discards anything bel
 **File:** `rag_utils.py` — `rerank_docs()`
 **Model:** `cross-encoder/ms-marco-MiniLM-L-6-v2` (sentence-transformers, runs on CPU)
 
-Two-stage retrieval: vector search returns 15 candidates, cross-encoder scores each `(query, document)` pair, returns top 5. The cross-encoder model is lazy-loaded on first use (~57ms inference).
+Two-stage retrieval: vector search returns 15 candidates, the cross-encoder scores each `(query, document)` pair and reorders them before MMR. The cross-encoder model is lazy-loaded on first use (~57ms inference). The agent leaves this step off: in the [Tier 1 evaluation](ragas_tier1_comparison.md) it lowered faithfulness on these docs.
 
 **Graceful degradation:** If `sentence-transformers` is not installed, reranking is skipped and results are returned as-is.
 

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
 
 class TestConfigDefaults:
     def test_default_model(self) -> None:
@@ -88,3 +94,19 @@ class TestModelPresets:
             assert "model" in preset, f"preset '{name}' missing 'model'"
             assert "temperature" in preset, f"preset '{name}' missing 'temperature'"
             assert "max_tokens" in preset, f"preset '{name}' missing 'max_tokens'"
+
+
+class TestDotenv:
+    def test_config_loads_dotenv_itself(self, tmp_path: Path) -> None:
+        # agent, interactive and streamlit_ui import config before their own load_dotenv()
+        shutil.copy(Path(__file__).resolve().parent.parent / "config.py", tmp_path)
+        (tmp_path / ".env").write_text("PINESCRIPT_TEMPERATURE=0.9\n")
+        env = {k: v for k, v in os.environ.items() if k != "PINESCRIPT_TEMPERATURE"}
+        result = subprocess.run(
+            [sys.executable, "-c", "import config; print(config.LLM_TEMPERATURE)"],
+            cwd=tmp_path,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert result.stdout.strip() == "0.9", result.stderr
