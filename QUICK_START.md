@@ -5,7 +5,7 @@ For a step by instruction , please refer to the [README.md](README.md) and [scri
 
 ## 1. Set Up Environment
 
-Make sure you have Python 3.9+ installed, then:
+Make sure you have Python 3.11+ installed, then:
 
 ```bash
 # Install dependencies

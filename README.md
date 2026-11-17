@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/FaustoS88/Pydantic-AI-Pinescript-Expert?style=social)](https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert)
 [![GitHub Forks](https://img.shields.io/github/forks/FaustoS88/Pydantic-AI-Pinescript-Expert?style=social)](https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert/network/members)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serves as an expert on Pine Script v6, TradingView's programming language for custom indicators and strategies. This agent leverages vector search technology and large language models to provide accurate, context-aware answers and generate working code examples.
@@ -32,7 +32,7 @@ A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serv
 
 ## Prerequisites
 
-- **Python 3.9+**
+- **Python 3.11+**
 - **PostgreSQL** with pgvector extension
 - **OpenAI API key** (required for embeddings and default LLM)
 - **OpenRouter API key** (optional, for alternative LLM providers)
