@@ -37,12 +37,14 @@ from config import (
     LLM_MAX_TOKENS,
     LLM_TEMPERATURE,
     MMR_LAMBDA,
+    MODEL_PRESETS,
     OPENROUTER_BASE_URL,
     OPENROUTER_DEFAULT_MODEL,
     RERANK_TOP_N,
     RETRIEVAL_CANDIDATES,
     SIMILARITY_THRESHOLD,
     THINKING_EFFORT,
+    get_preset,
 )
 from rag_utils import hybrid_retrieve
 
@@ -260,8 +262,6 @@ def resolve_model(preset: str | None = None) -> OpenAIChatModel | None:
     openrouter_api_key = configured_key("OPENROUTER_API_KEY")
 
     if preset:
-        from config import MODEL_PRESETS, get_preset
-
         if preset in MODEL_PRESETS:
             cfg = get_preset(preset)
             model_id = str(cfg["model"])
@@ -314,6 +314,13 @@ async def run_agent(question: str, preset: str | None = None, message_history=No
             run_kwargs: dict = {"deps": deps}
             if model is not None:
                 run_kwargs["model"] = model
+                if preset in MODEL_PRESETS:
+                    # a preset brings its own temperature and max tokens
+                    cfg = get_preset(preset)
+                    run_kwargs["model_settings"] = {
+                        "temperature": float(cfg["temperature"]),
+                        "max_tokens": int(cfg["max_tokens"]),
+                    }
             if message_history:
                 run_kwargs["message_history"] = message_history
 

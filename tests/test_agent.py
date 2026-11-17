@@ -13,6 +13,7 @@ from agent import (
     pinescript_rag,
     resolve_model,
     retrieve,
+    run_agent,
 )
 from config import EMBEDDING_MODEL, OPENROUTER_DEFAULT_MODEL
 from rag_utils import RetrievedDoc
@@ -173,3 +174,29 @@ class TestResolveModel:
     ) -> None:
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         assert resolve_model("flash") is None
+
+
+# ---------------------------------------------------------------------------
+# run_agent — a preset's temperature and max tokens reach the run.
+# ---------------------------------------------------------------------------
+
+
+class TestRunAgentPresets:
+    @pytest.mark.asyncio
+    async def test_preset_settings_reach_the_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from config import get_preset
+
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+        with (
+            patch("agent.get_openai_api_key", return_value="sk-test"),
+            patch("agent.database_connect"),
+            patch("agent.pinescript_agent") as fake_agent,
+        ):
+            fake_agent.run = AsyncMock()
+            await run_agent("How do I plot an SMA?", preset="codex")
+
+        preset = get_preset("codex")
+        assert fake_agent.run.call_args.kwargs["model_settings"] == {
+            "temperature": preset["temperature"],
+            "max_tokens": preset["max_tokens"],
+        }
