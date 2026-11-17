@@ -225,7 +225,7 @@ the retriever finds the right chunks 92% of the time — the remaining gap is a 
 (docs lack complete strategy templates), not a retrieval problem.
 
 **Tier 1 improvements** ([docs](docs/RAG_IMPROVEMENTS.md)):
-hybrid BM25+vector search, similarity threshold, cross-encoder reranking, recursive chunking with overlap, MMR deduplication, contextual chunk headers
+hybrid BM25+vector search, similarity threshold, cross-encoder reranking (available, off in the agent because it lowered faithfulness), recursive chunking with overlap, MMR deduplication, contextual chunk headers
 
 **Tier 2 improvements** ([docs](docs/RAG_IMPROVEMENTS_TIER2.md)):
 code-aware chunking (fenced blocks never split), Anthropic Contextual Retrieval (LLM prefix per chunk at crawl time), content type detection, metadata columns

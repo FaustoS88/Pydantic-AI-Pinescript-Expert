@@ -67,8 +67,8 @@ Two-stage retrieval: vector search returns 15 candidates, the cross-encoder scor
 
 Replaced h2-only splitting with recursive character splitting:
 - **Separators (in order):** `\n\n` → `\n` → `. ` → ` `
-- **chunk_size:** 500 characters (configurable via `PINESCRIPT_CHUNK_SIZE`)
-- **chunk_overlap:** 50 characters (configurable via `PINESCRIPT_CHUNK_OVERLAP`)
+- **chunk_size:** 1000 characters (configurable via `PINESCRIPT_CHUNK_SIZE`)
+- **chunk_overlap:** 100 characters (configurable via `PINESCRIPT_CHUNK_OVERLAP`)
 
 Each heading-based section is first identified, then recursively split if it exceeds `chunk_size`. Chunks inherit their parent section title for contextual headers.
 
@@ -93,11 +93,11 @@ All parameters are configurable via environment variables:
 | `PINESCRIPT_HYBRID_ALPHA` | 0.5 | Vector vs BM25 weight |
 | `PINESCRIPT_SIMILARITY_THRESHOLD` | 0.3 | Minimum cosine similarity |
 | `PINESCRIPT_RETRIEVAL_CANDIDATES` | 15 | Initial candidates before reranking |
-| `PINESCRIPT_RERANK_TOP_N` | 5 | Final results after reranking |
+| `PINESCRIPT_RERANK_TOP_N` | 15 | Final results after reranking |
 | `PINESCRIPT_RERANK_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Reranking model |
 | `PINESCRIPT_MMR_LAMBDA` | 0.7 | MMR relevance/diversity tradeoff |
-| `PINESCRIPT_CHUNK_SIZE` | 500 | Target chunk size (characters) |
-| `PINESCRIPT_CHUNK_OVERLAP` | 50 | Overlap between chunks |
+| `PINESCRIPT_CHUNK_SIZE` | 1000 | Target chunk size (characters) |
+| `PINESCRIPT_CHUNK_OVERLAP` | 100 | Overlap between chunks |
 
 ## Migration
 
