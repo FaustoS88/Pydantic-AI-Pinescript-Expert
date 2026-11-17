@@ -159,8 +159,7 @@ pinescript_rag = Capability(
 async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
     """Retrieve relevant Pine Script documentation using hybrid search.
 
-    Pipeline: vector + BM25 → RRF fusion → similarity threshold →
-    cross-encoder reranking → MMR deduplication.
+    Pipeline: vector + BM25 → RRF fusion → similarity threshold → MMR deduplication.
 
     Args:
         ctx: Run context with database pool and OpenAI client.
@@ -180,6 +179,7 @@ async def retrieve(ctx: RunContext[Dependencies], search_query: str) -> str:
             threshold=SIMILARITY_THRESHOLD,
             top_n=RERANK_TOP_N,
             mmr_lambda=MMR_LAMBDA,
+            enable_rerank=False,  # off as in the evaluations: ms-marco hurts code docs
         )
 
         if not docs:

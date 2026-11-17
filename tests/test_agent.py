@@ -42,8 +42,8 @@ def _doc(url: str, title: str, content: str) -> RetrievedDoc:
 # ---------------------------------------------------------------------------
 # retrieve() tool tests
 #
-# retrieve() delegates the whole vector + BM25 → RRF → threshold → rerank →
-# MMR pipeline to rag_utils.hybrid_retrieve (covered in test_rag_improvements),
+# retrieve() delegates the whole vector + BM25 → RRF → threshold → MMR pipeline
+# (reranking off) to rag_utils.hybrid_retrieve (covered in test_rag_improvements),
 # so these tests patch it and assert the tool's own contract: formatting,
 # the empty case, and error handling.
 # ---------------------------------------------------------------------------
@@ -90,6 +90,7 @@ class TestRetrieveTool:
         assert kwargs["pool"] is deps.pool
         assert kwargs["openai_client"] is deps.openai
         assert kwargs["embedding_model"] == EMBEDDING_MODEL
+        assert kwargs["enable_rerank"] is False
 
     @pytest.mark.asyncio
     async def test_handles_retrieval_error(self) -> None:

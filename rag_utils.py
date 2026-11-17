@@ -436,7 +436,8 @@ async def hybrid_retrieve(
         threshold: Minimum cosine similarity to keep a result.
         top_n: Final number of results to return.
         mmr_lambda: MMR diversity parameter.
-        enable_rerank: Whether to use cross-encoder reranking.
+        enable_rerank: Whether to use cross-encoder reranking; the agent passes False
+            because it lowered faithfulness in the Tier 1 evaluation.
         enable_mmr: Whether to use MMR deduplication.
 
     Returns:
