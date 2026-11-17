@@ -44,7 +44,7 @@ A Retrieval-Augmented Generation (RAG) AI Agent built with Pydantic AI that serv
 
    ```bash
    git clone https://github.com/FaustoS88/Pydantic-AI-Pinescript-Expert.git
-   cd pinescript-expert
+   cd Pydantic-AI-Pinescript-Expert
    ```
 
 2. **Setup PostgreSQL with pgvector using Docker**
@@ -65,6 +65,7 @@ docker run --name pinescript-pgvector \
 
    ```bash
    python setup.py
+   source venv/bin/activate  # on Windows: venv\Scripts\activate
    # Edit the created .env file with your API keys
    ```
 
