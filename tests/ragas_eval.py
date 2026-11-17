@@ -54,6 +54,8 @@ from config import (  # noqa: E402
     EMBEDDING_MODEL,
     HYBRID_SEARCH_ALPHA,
     MMR_LAMBDA,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_DEFAULT_MODEL,
     RERANK_TOP_N,
     RETRIEVAL_CANDIDATES,
     SIMILARITY_THRESHOLD,
@@ -65,9 +67,6 @@ TESTSET_PATH = SCRIPT_DIR / "ragas_testset.json"
 RESULTS_DIR = PROJECT_ROOT / "results"
 
 CATEGORIES = ["function_lookup", "conceptual", "code_generation", "complex"]
-
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = os.getenv("OPENROUTER_DEFAULT_MODEL", "openai/gpt-4.1-mini")
 
 SYSTEM_PROMPT = (
     "You are a Pine Script v6 expert assistant. Pine Script is the programming "
@@ -159,7 +158,7 @@ async def generate_answer(
                 "Content-Type": "application/json",
             },
             json={
-                "model": OPENROUTER_MODEL,
+                "model": OPENROUTER_DEFAULT_MODEL,
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_msg},
@@ -454,7 +453,7 @@ async def run_evaluation(output_path: Path, retrieval_mode: str = "baseline") ->
         "embedding_model": EMBEDDING_MODEL,
         "retrieval_limit": VECTOR_SEARCH_LIMIT if retrieval_mode == "baseline" else RERANK_TOP_N,
         "retrieval_method": RETRIEVAL_METHODS[retrieval_mode],
-        "generation_model": OPENROUTER_MODEL,
+        "generation_model": OPENROUTER_DEFAULT_MODEL,
         "db_url": db_url.split("@")[-1],  # mask credentials
     }
 
